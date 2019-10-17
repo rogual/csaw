@@ -1412,7 +1412,7 @@ def main():
         parser.error('at least one of -oc and -oh must be specified.')
 
     try:
-        Database(args.inputs, args.oc, args.oh, args.i, args.dt).emit_all()
+        Database(args.inputs, args.oc, args.oh, args.i or [], args.dt).emit_all()
     except ParseError as e:
         print(e.args[0], file=sys.stderr)
         sys.exit(1)
