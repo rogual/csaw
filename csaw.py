@@ -35,6 +35,8 @@ import functools
 import argparse
 from collections import defaultdict
 
+line_directives_enabled = True
+
 
 def fatal(msg):
     print('\n--- FATAL ERROR ---', file=sys.stderr)
@@ -257,6 +259,10 @@ class Node:
     def text_with_line_directive(self):
         return self.range.text_with_line_directive
 
+    def emit_line_directive(self, f):
+        if line_directives_enabled:
+            f.write(self.line_directive)
+
     def __repr__(self):
         r = '%s(%s)' % (
             self.__class__.__name__,
@@ -337,7 +343,7 @@ class BaseRecord(Node):
 class AccessLabel(Node):
 
     def emit_interface(self, f):
-        f.write(self.line_directive)
+        self.emit_line_directive(f)
         f.write(self.access + ':\n\n')
 
     @classmethod
@@ -523,9 +529,16 @@ class RecordDefinition(Node):
 
         return deps
 
+    def emit_forward_declaration(self, f):
+
+        if self.template_params:
+            f.write('template %s ' % self.template_params.text)
+
+        f.write('%s %s;\n' % (self.record_kind, self.name))
+
     def emit_interface(self, f):
         if self.record_kind in ['enum', 'enum class']:
-            f.write(self.line_directive)
+            self.emit_line_directive(f)
             f.write(self.text)
         else:
             f.write(self.head.text_with_line_directive)
@@ -822,7 +835,7 @@ class NamespaceDeclaration(Node):
         return self
 
     def emit_interface(self, f):
-        f.write(self.line_directive)
+        self.emit_line_directive(f)
         f.write('namespace %s {\n\n' % self.name)
 
         for child in self.children:
@@ -831,7 +844,7 @@ class NamespaceDeclaration(Node):
         f.write('}\n\n')
 
     def emit_implementation(self, f):
-        f.write(self.line_directive)
+        self.emit_line_directive(f)
         f.write('namespace %s {\n\n' % self.name)
 
         for child in self.children:
@@ -885,7 +898,7 @@ class Declaration(Node):
     def emit_forward_declaration(self, f):
         record = self.specifier.record_definition
         if record:
-            f.write('%s %s;\n' % (record.record_kind, record.name))
+            record.emit_forward_declaration(f)
 
     def emit_interface(self, f):
 
@@ -900,8 +913,9 @@ class Declaration(Node):
             return
 
         if self.specifier.record_definition and self.specifier.template_params:
-            f.write(self.line_directive)
+            self.emit_line_directive(f)
             f.write(self.text)
+            f.write('\n\n')
             return
 
         # Otherwise, it's types + vars
@@ -909,7 +923,7 @@ class Declaration(Node):
         if record:
             record.emit_interface(f)
         else:
-            f.write(self.line_directive)
+            self.emit_line_directive(f)
             spec = self.specifier.text
             if spec:
                 f.write(spec + ' ')
@@ -918,7 +932,7 @@ class Declaration(Node):
         f.write(';\n\n')
 
     def emit_function_declaration(self, f):
-        f.write(self.line_directive)
+        self.emit_line_directive(f)
         spec = self.specifier.text
         if spec:
             f.write(spec + ' ')
@@ -926,7 +940,7 @@ class Declaration(Node):
         f.write(';\n\n')
 
     def emit_static_member_vars_interface(self, f):
-        f.write(self.line_directive)
+        self.emit_line_directive(f)
 
         if self.specifier.is_constexpr:
             f.write(self.text + '\n\n')
@@ -950,7 +964,7 @@ class Declaration(Node):
         if self.specifier.is_constexpr:
             return
 
-        f.write(self.line_directive)
+        self.emit_line_directive(f)
 
         for token in self.specifier.range.tokens:
             if token.text != 'static':
@@ -972,7 +986,7 @@ class Declaration(Node):
 
     def emit_function_definition(self, f):
 
-        f.write(self.line_directive)
+        self.emit_line_directive(f)
 
         for token in self.specifier.range.tokens:
             if token.text not in ['virtual', 'static']:
@@ -1098,7 +1112,7 @@ class ObjCMethod(Node):
 
     def emit_interface(self, f):
         tokens = self.range.tokens
-        f.write(self.line_directive)
+        self.emit_line_directive(f)
         for i, token in enumerate(tokens):
             j = i + 1
             if j < len(tokens) and tokens[j].text == '{':
@@ -1109,7 +1123,7 @@ class ObjCMethod(Node):
             f.write(token.text_with_whitespace)
 
     def emit_implementation(self, f):
-        f.write(self.line_directive)
+        self.emit_line_directive(f)
         f.write(self.text)
         f.write('\n\n')
 
@@ -1215,7 +1229,7 @@ class ObjCClass(Node):
         f.write('@end\n\n')
 
     def emit_implementation(self, f):
-        f.write(self.line_directive)
+        self.emit_line_directive(f)
         f.write('@implementation %s\n\n' % self.name)
         for method in self.methods:
             method.emit_implementation(f)
@@ -1273,9 +1287,7 @@ class Database:
         for decl in self.decls:
             decl.emit_implementation(f)
 
-    def emit_all(self):
-
-        # Parse all declarations
+    def parse(self):
         self.decls = []
         for path in self.input_paths:
 
@@ -1297,9 +1309,15 @@ class Database:
         # Figure out interface dependencies
         self.sort_decls()
         
+
+    def emit_all(self):
+        self.parse()
+
+        # Parse all declarations
         # Emit output
         if self.header_path:
             with open(self.header_path, 'wt') as f:
+                f.write('#pragma once\n\n')
                 self.emit_interfaces(f)
 
         if self.source_path:
