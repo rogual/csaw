@@ -23,6 +23,10 @@ Areas where csaw needs some help:
 
     #depends<T> vector<T> T
 
+Preprocessor
+   Not supported. Preprocess your files before csaw sees them. One
+   custom directive is supported, #depends, which marks all items
+   in a file as depending on a specific name.
 """
 
 from typing import List
@@ -52,6 +56,7 @@ TString = sys.intern('String')
 TWord = sys.intern('Word')
 TPunctuation = sys.intern('Punctuation')
 TNumber = sys.intern('Number')
+TDirective = sys.intern('Directive')
 TEnd = sys.intern('End')
 
 
@@ -106,6 +111,7 @@ class Lexer:
         (None, re.compile(r'/\*.*?\*/', re.DOTALL)),
         (TString, re.compile(r'"([^"\\]|\\.)*"')),
         (TString, re.compile(r"'([^'\\]|\\.)*'")),
+        (TDirective, re.compile(r"#[a-z]+")),
         (TWord, re.compile(r'@?[A-Za-z_][A-Za-z_0-9]*')),
         (TNumber, re.compile(r'[0-9][0-9A-Fa-f.]*')),
         (TPunctuation, re.compile(r'<<')),
@@ -856,6 +862,12 @@ class NamespaceDeclaration(Node):
     def defined_names(self):
         return [self.name]
 
+    def get_dependencies(self, names):
+        deps = set()
+        for child in self.children:
+            deps = deps | child.get_dependencies(names)
+        return deps
+
 
 class Declaration(Node):
 
@@ -866,6 +878,7 @@ class Declaration(Node):
         self.initializer_list = None
         self.function_body = None
         self.declarators = []
+        self.manual_deps = []
 
         self.specifier = Specifier.parse(cursor)
 
@@ -1066,6 +1079,8 @@ class Declaration(Node):
                 for d in self.declarators
             ):
                 r = r | spec_deps
+
+        r |= set(self.manual_deps)
 
         return r
 
@@ -1293,6 +1308,8 @@ class Database:
 
             tokens = Lexer(path)
 
+            manual_deps = []
+
             if self.debug_lexer:
                 cursor = Cursor(tokens, 0)
                 while cursor:
@@ -1303,7 +1320,14 @@ class Database:
 
             cursor = Cursor(tokens, 0)
             while cursor:
+
+                while cursor.text == '#depends':
+                    cursor.next()
+                    manual_deps.append(cursor.text)
+                    cursor.next()
+
                 decl = parse_declaration(cursor)
+                decl.manual_deps = manual_deps
                 self.decls.append(decl)
 
         # Figure out interface dependencies
@@ -1329,19 +1353,6 @@ class Database:
 
     def sort_decls(self):
         decls = self.decls
-
-        manual_deps = [
-            ('VIFBitmap', 'ScanlineFill'),
-
-            ('Render', 'DebugText'),
-            ('Render', 'Image'),
-            ('Render', 'Sprite'),
-            ('Render', 'App'),
-            ('Render', 'Package'),
-            ('Render', 'Scripts'),
-            ('Scripts', 'App')
-            
-        ]
 
         names = set()
         decls_by_name = defaultdict(set)
