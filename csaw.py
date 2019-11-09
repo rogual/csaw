@@ -639,6 +639,10 @@ class Specifier(Node):
                 self.record_definition = RecordDefinition.parse(cursor)
                 return self
 
+            elif cursor.text == 'operator':
+                # This must be a conversion operator; stop parsing the specifier
+                return self
+
             elif cursor.type == TWord:
                 # If this is a constructor, stop parsing the specifier
                 if RecordScope and cursor.text == RecordScope[-1].name:
@@ -866,6 +870,7 @@ class NamespaceDeclaration(Node):
         deps = set()
         for child in self.children:
             deps = deps | child.get_dependencies(names)
+        deps |= set(self.manual_deps)
         return deps
 
 
@@ -1324,6 +1329,7 @@ class Database:
                 while cursor.text == '#depends':
                     cursor.next()
                     manual_deps.append(cursor.text)
+                    print(cursor.text)
                     cursor.next()
 
                 decl = parse_declaration(cursor)
@@ -1367,10 +1373,6 @@ class Database:
                 for dep in decl.get_dependencies(names):
                     for dep_decl in decls_by_name[dep]:
                         if dep_decl is not decl:
-                            decl_deps.add((dep_decl, decl))
-                for a, b in manual_deps:
-                    if b == name:
-                        for dep_decl in decls_by_name[a]:
                             decl_deps.add((dep_decl, decl))
 
         deps_by_decl = defaultdict(set)
