@@ -115,6 +115,8 @@ class Lexer:
         (TWord, re.compile(r'@?[A-Za-z_][A-Za-z_0-9]*')),
         (TNumber, re.compile(r'[0-9][0-9A-Fa-f.]*')),
         (TPunctuation, re.compile(r'<<')),
+        (TPunctuation, re.compile(r'\[\[')),
+        (TPunctuation, re.compile(r'\]\]')),
         (TPunctuation, re.compile(r'::')),
         (TPunctuation, re.compile(r'->')),
         (TPunctuation, re.compile('[' + re.escape(string.punctuation) + ']')),
@@ -574,6 +576,7 @@ class Specifier(Node):
         self.is_virtual = False
         self.is_inline = False
         self.is_constexpr = False
+        self.attributes = []
 
         while cursor:
             if cursor.text in ['class', 'struct', 'union', 'enum']:
@@ -660,6 +663,16 @@ class Specifier(Node):
             elif cursor.text == '~':
                 # This is a destructor; stop parsing the specifier
                 return self
+
+            elif cursor.text == '[[':
+                cursor.next()
+                attr = cursor.text
+                self.attributes.append(attr)
+                cursor.next()
+                if cursor.text != ']]':
+                    cursor.error('Expected "]]" after "%s" to close attribute specifier' % attr)
+                cursor.next()
+
 
             else:
                 if self.record_kind or self.name:
@@ -1329,7 +1342,6 @@ class Database:
                 while cursor.text == '#depends':
                     cursor.next()
                     manual_deps.append(cursor.text)
-                    print(cursor.text)
                     cursor.next()
 
                 decl = parse_declaration(cursor)
