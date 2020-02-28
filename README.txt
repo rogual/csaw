@@ -106,8 +106,8 @@ class B {
 Avoid using nested names from outside their containing class.
 
 
-Limitations: Namespaces
------------------------
+Limitation: Namespaces
+----------------------
 
 Anonymous namespaces are not supported.
 

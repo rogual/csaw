@@ -15,21 +15,24 @@ TODO:
 Areas where csaw needs some help:
 
   Nested classes
-    Use #depends Parent if you use Parent::x
+    Use #pragma depends Parent if you use Parent::x
 
   Templates
     No way of knowing whether template params need to be fully
     defined or not. We just assume they do.
 
-    #depends<T> vector<T> T
+    #pragma depends<T> vector<T> T
 
 Preprocessor
    Not supported. Preprocess your files before csaw sees them. One
-   custom directive is supported, #depends, which marks all items
+   custom directive is supported, #pragma depends, which marks all items
    in a file as depending on a specific name.
 """
 
 from typing import List
+import concurrent.futures
+import contextlib
+import threading
 import string
 import array
 import sys
@@ -44,7 +47,7 @@ line_directives_enabled = True
 
 def fatal(msg):
     print('\n--- FATAL ERROR ---', file=sys.stderr)
-    for item in RecordScope:
+    for item in local.RecordScope:
         print('While parsing ', item, file=sys.stderr)
     print(msg, file=sys.stderr)
     raise Exception(msg)
@@ -59,8 +62,16 @@ TNumber = sys.intern('Number')
 TDirective = sys.intern('Directive')
 TEnd = sys.intern('End')
 
+local = threading.local()
+    
+local.RecordScope = []
 
-RecordScope = []
+
+@contextlib.contextmanager
+def append(xs, x):
+    xs.append(x)
+    yield
+    xs.pop()
     
 
 
@@ -71,6 +82,9 @@ class Token:
         self.index = index
         self.length = length
         self.tokens = []
+
+        self.mapped_line_offset = 0
+        self.mapped_path = None
 
     @property
     def text(self):
@@ -91,14 +105,22 @@ class Token:
         return self.lexer.source_text[i:j]
 
     @property
-    def line(self):
+    def real_line(self):
         if self.type == TEnd:
             return self.lexer.line_map[-1] + 1
         return self.lexer.line_map[self.index]
 
     @property
+    def line(self):
+        return self.real_line + self.mapped_line_offset
+
+    @property
+    def path(self):
+        return self.mapped_path or self.lexer.input_path
+
+    @property
     def line_directive(self):
-        return '#line %i "%s"\n' % (self.line, self.lexer.input_path)
+        return '#line %i "%s"\n' % (self.line, self.path)
         
     def __repr__(self):
         return '%s "%s"' % (self.type, self.text)
@@ -107,7 +129,7 @@ class Token:
 class Lexer:
     regexes = [
         (None, re.compile(r'\s+')),
-        (None, re.compile(r'//.*?\n')),
+        (None, re.compile(r'//.*?(\n|$)')),
         (None, re.compile(r'/\*.*?\*/', re.DOTALL)),
         (TString, re.compile(r'"([^"\\]|\\.)*"')),
         (TString, re.compile(r"'([^'\\]|\\.)*'")),
@@ -121,6 +143,8 @@ class Lexer:
         (TPunctuation, re.compile(r'->')),
         (TPunctuation, re.compile('[' + re.escape(string.punctuation) + ']')),
     ]
+
+    line_directive_regex = re.compile('(\d+) "(.*)"')
 
     def __init__(self, input_path):
         self.input_path = input_path
@@ -139,6 +163,9 @@ class Lexer:
         self.tokens = []
 
         # Tokenize
+        mapped_path = None
+        mapped_line_offset = 0
+        
         pos = 0
         while pos < source_length:
             for type_, regex in Lexer.regexes:
@@ -147,10 +174,45 @@ class Lexer:
                     span = match.span(0)
                     length = span[1] - span[0]
                     assert length > 0
+                    token = None
                     if type_ is not None:
                         token = Token(self, type_, pos, length)
-                        self.tokens.append(token)
-                    pos += length
+
+                        if mapped_path is not None:
+                            token.mapped_path = mapped_path
+                            token.mapped_line_offset = mapped_line_offset
+
+                    # Handle line directives
+                    if token and token.text == '#':
+
+                        line_end = self.source_text.find('\n', pos)
+
+                        if self.source_text[pos + 1] == ' ':
+                            m = Lexer.line_directive_regex.search(
+                                self.source_text,
+                                pos,
+                                line_end
+                            )
+
+                            if m:
+                                mapped_line = int(m.group(1))
+                                mapped_path = m.group(2)
+                                mapped_line_offset = mapped_line - token.real_line - 1
+
+                            else:
+                                fatal("Wonky line directive in '%s'" % input_path)
+
+                            pos = line_end
+
+                        else:
+                            pos += length
+
+                    # Normal token
+                    else:
+                        if token:
+                            self.tokens.append(token)
+                        pos += length
+
                     break
             else:
                 fatal('Unexpected character at index %i of "%s"' % (pos, input_path))
@@ -182,9 +244,11 @@ class Cursor:
         self.index += 1
 
     def error(self, msg):
-        raise ParseError(
-            '%s:%i:%s' % (self.tokens.input_path, self.token.line, msg)
+        e = ParseError(
+            '%s:%i:%s' % (self.token.path, self.token.line, msg)
         )
+        e.record_scope = local.RecordScope[:]
+        raise e
 
     @property
     def token(self):
@@ -242,9 +306,9 @@ class TokenRange:
     def line_directive(self):
         return self.start_cursor.token.line_directive
 
-    @property
-    def text_with_line_directive(self):
-        return self.start_cursor.token.line_directive + self.text
+    def emit_line_directive(self, f):
+        if line_directives_enabled:
+            f.write(self.line_directive)
 
 
 class Node:
@@ -263,10 +327,6 @@ class Node:
     def line_directive(self):
         return self.range.line_directive
 
-    @property
-    def text_with_line_directive(self):
-        return self.range.text_with_line_directive
-
     def emit_line_directive(self, f):
         if line_directives_enabled:
             f.write(self.line_directive)
@@ -282,7 +342,7 @@ class Node:
             )
         )
         if self.dump_text:
-            r += ' "' + self.text + '"'
+            r += ' <"' + self.text + '">'
         return r
 
     def dump(self, indent=0):
@@ -310,10 +370,16 @@ class Node:
     def emit_forward_declaration(self, f):
         pass
 
+    def emit_typedefs(self, f):
+        pass
+
     def emit_interface(self, f):
         pass
 
     def emit_implementation(self, f):
+        pass
+
+    def emit_inline_function_definitions(self, f):
         pass
 
     def get_dependencies(self, names):
@@ -328,24 +394,30 @@ class BaseRecord(Node):
         self = BaseRecord()
         self.access = None
         self.name = None
+        self.template_params = None
 
         while cursor:
             if cursor.text in ['public', 'protected', 'private']:
                 if self.access:
                     cursor.error('Too many access specifiers')
                 self.access = cursor.text
+                cursor.next()
 
             elif cursor.type == TWord:
                 if self.name:
                     cursor.error('Unexpected "%s"' % cursor.text)
                 self.name = cursor.text
+                cursor.next()
+
+            elif cursor.text == '<':
+                if self.template_params:
+                    cursor.error("Extra template paramter list")
+                self.template_params = TemplateParams.parse(cursor)
 
             else:
                 if self.name:
                     return self
                 cursor.error("Base type declaration has no name")
-
-            cursor.next()
 
 
 class AccessLabel(Node):
@@ -498,31 +570,29 @@ class RecordDefinition(Node):
         head_end.next()
         self.head.set_end(head_end)
 
-        RecordScope.append(self)
-
-        if self.record_kind in ['enum', 'enum class']:
-            self.enum_values = FunctionBody.parse(cursor)
-        else:
-            cursor.next()
-            while cursor:
-                if cursor.text == '}':
-                    cursor.next()
-                    break
-
-                elif cursor.text in ['public', 'private', 'protected']:
-                    label = AccessLabel.parse(cursor)
-                    self.children.append(label)
-
-                else:
-                    decl = Declaration.parse(cursor)
-                    assert decl
-                    self.children.append(decl)
-
-                    # Decl could be function def (no ';') or normal def (';')
-                    if cursor.text == ';':
+        with append(local.RecordScope, self):
+            if self.record_kind in ['enum', 'enum class']:
+                self.enum_values = FunctionBody.parse(cursor)
+            else:
+                cursor.next()
+                while cursor:
+                    if cursor.text == '}':
                         cursor.next()
+                        break
 
-        RecordScope.pop()
+                    elif cursor.text in ['public', 'private', 'protected']:
+                        label = AccessLabel.parse(cursor)
+                        self.children.append(label)
+
+                    else:
+                        decl = Declaration.parse(cursor)
+                        assert decl
+                        self.children.append(decl)
+
+                        # Decl could be function def (no ';') or normal def (';')
+                        if cursor.text == ';':
+                            cursor.next()
+
         return self
 
     def get_dependencies(self, names):
@@ -542,20 +612,31 @@ class RecordDefinition(Node):
         if self.template_params:
             f.write('template %s ' % self.template_params.text)
 
-        f.write('%s %s;\n' % (self.record_kind, self.name))
+        if self.record_kind in ['enum', 'enum class']:
+            self.emit_line_directive(f)
+            f.write(self.text + ';')
+        else:
+            f.write('%s %s;\n' % (self.record_kind, self.name))
 
     def emit_interface(self, f):
         if self.record_kind in ['enum', 'enum class']:
-            self.emit_line_directive(f)
-            f.write(self.text)
+            pass
         else:
-            f.write(self.head.text_with_line_directive)
+            self.head.emit_line_directive(f)
+            f.write(self.head.text)
             f.write('\n')
 
-            for child in self.children:
-                child.emit_interface(f)
+            with append(local.RecordScope, self.name):
+                for child in self.children:
+                    child.emit_typedefs(f)
+                    child.emit_interface(f)
 
             f.write('}')
+
+    def emit_inline_function_definitions(self, f):
+        with append(local.RecordScope, self.name):
+            for child in self.children:
+                child.emit_inline_function_definitions(f)
 
 
 class Specifier(Node):
@@ -648,7 +729,7 @@ class Specifier(Node):
 
             elif cursor.type == TWord:
                 # If this is a constructor, stop parsing the specifier
-                if RecordScope and cursor.text == RecordScope[-1].name:
+                if local.RecordScope and cursor.text == local.RecordScope[-1].name:
                     next_cursor = cursor.copy()
                     next_cursor.next()
                     if next_cursor.text == '(':
@@ -701,6 +782,8 @@ class FunctionBody(Node):
                     cursor.error("Unexpected '}'")
             cursor.next()
 
+        cursor.error("Expected '}'")
+
 
 class InitializerList(Node):
     @classmethod
@@ -725,6 +808,13 @@ class InitializerList(Node):
 class Declarator(Node):
 
     dump_text = True
+
+    @classmethod
+    def parse(cls, cursor):
+        node = super().parse(cursor)
+        if node.text == '()':
+            cursor.error("'()' is not a valid declarator")
+        return node
     
     @classmethod
     def _parse(cls, cursor):
@@ -741,9 +831,9 @@ class Declarator(Node):
 
             if level == 0 and cursor.text in [',', ';', '{', ':']:
                 break
-            if cursor.text in ['(', '[', '{', '<']:
+            if cursor.text in ['(', '[', '{',]:
                 level += 1
-            elif cursor.text in [')', ']', '}', '>']:
+            elif cursor.text in [')', ']', '}',]:
                 level -= 1
                 if level < 0:
                     cursor.error("Unexpected '}'")
@@ -767,7 +857,7 @@ class Declarator(Node):
                 break
 
         if name_i is None:
-            raise Exception("Cannot find declarator's name")
+            self.range.start_cursor.error("Cannot find declarator's name: " + self.text)
 
         l = r = name_i
         end = len(tokens)
@@ -862,6 +952,7 @@ class NamespaceDeclaration(Node):
         f.write('namespace %s {\n\n' % self.name)
 
         for child in self.children:
+            child.emit_typedefs(f)
             child.emit_interface(f)
 
         f.write('}\n\n')
@@ -872,6 +963,15 @@ class NamespaceDeclaration(Node):
 
         for child in self.children:
             child.emit_implementation(f)
+
+        f.write('}\n\n')
+
+    def emit_inline_function_definitions(self, f):
+        self.emit_line_directive(f)
+        f.write('namespace %s {\n\n' % self.name)
+
+        for child in self.children:
+            child.emit_inline_function_definitions(f)
 
         f.write('}\n\n')
 
@@ -926,10 +1026,33 @@ class Declaration(Node):
 
         return self
 
+    @property
+    def is_inline_or_template_function(self):
+        return self.function_body and (
+            self.specifier.is_inline or (
+                self.specifier.template_params and
+                not local.RecordScope
+            )
+        )
+
     def emit_forward_declaration(self, f):
         record = self.specifier.record_definition
         if record:
             record.emit_forward_declaration(f)
+
+    def emit_typedefs(self, f):
+        if self.specifier.is_typedef:
+            f.write(self.text)
+            f.write('\n')
+
+    def emit_inline_function_definitions(self, f):
+        if self.is_inline_or_template_function:
+            self.emit_function_definition(f)
+            return
+        
+        record = self.specifier.record_definition
+        if record:
+            record.emit_inline_function_definitions(f)
 
     def emit_interface(self, f):
 
@@ -949,18 +1072,45 @@ class Declaration(Node):
             f.write('\n\n')
             return
 
-        # Otherwise, it's types + vars
+        if self.specifier.is_typedef:
+            return
+
         record = self.specifier.record_definition
         if record:
             record.emit_interface(f)
-        else:
+            f.write(', '.join(d.text for d in self.declarators))
+            f.write(';\n\n')
+            return
+
+        # If this is a record member: 
+        if local.RecordScope:
             self.emit_line_directive(f)
             spec = self.specifier.text
             if spec:
                 f.write(spec + ' ')
 
-        f.write(', '.join(d.text for d in self.declarators))
-        f.write(';\n\n')
+            f.write(', '.join(d.text for d in self.declarators))
+            f.write(';\n\n')
+            return
+        
+        # Otherwise, it's types & vars:
+        if not self.declarators:
+            raise Exception(self.line_directive)
+
+        # HACK
+        if self.specifier.text.endswith('Command'):
+            f.write('extern %s ' % self.specifier.text)
+            f.write(', '.join(d.name for d in self.declarators))
+            f.write(';\n')
+            return
+
+        self.emit_line_directive(f)
+        f.write('extern %s' % self.specifier.text)
+        for decl in self.declarators:
+            text = re.sub('=.*', '', decl.text)
+            text = re.sub(r'\(.*?\)', '', text)
+            f.write(' %s' % text)
+        f.write(';\n')
 
     def emit_function_declaration(self, f):
         self.emit_line_directive(f)
@@ -1009,7 +1159,7 @@ class Declaration(Node):
             scoped = False
             for token in declarator.range.tokens:
                 if (not scoped) and token.text == declarator.name:
-                    f.write('::'.join(RecordScope + ['']))
+                    f.write('::'.join(local.RecordScope + ['']))
                     scoped = True
                 f.write(token.text_with_whitespace)
 
@@ -1028,7 +1178,7 @@ class Declaration(Node):
         for token in declarator.range.tokens:
             if token.text != 'override':
                 if (not scoped) and (token.text == declarator.name or token.text == '~'):
-                    f.write('::'.join(RecordScope + ['']))
+                    f.write('::'.join(local.RecordScope + ['']))
                     scoped = True
                 f.write(token.text_with_whitespace)
 
@@ -1041,7 +1191,8 @@ class Declaration(Node):
         
     def emit_implementation(self, f):
         if self.function_body:
-            self.emit_function_definition(f)
+            if not self.is_inline_or_template_function:
+                self.emit_function_definition(f)
             return
 
         if self.specifier.is_static:
@@ -1051,12 +1202,20 @@ class Declaration(Node):
         if self.specifier.record_definition and self.specifier.template_params:
             return
 
+        if self.specifier.is_typedef:
+            return
+
         record = self.specifier.record_definition
         if record:
-            for child in record.children:
-                RecordScope.append(record.name)
-                child.emit_implementation(f)
-                RecordScope.pop()
+            with append(local.RecordScope, record.name):
+                for child in record.children:
+                    child.emit_implementation(f)
+            return
+
+        if not local.RecordScope:
+            self.emit_line_directive(f)
+            f.write(self.text)
+            f.write('\n')
 
     @property
     def defined_names(self):
@@ -1069,6 +1228,7 @@ class Declaration(Node):
 
     def get_dependencies(self, names):
         r = set()
+
         record = self.specifier.record_definition
         if record:
             r = r | record.get_dependencies(names)
@@ -1159,6 +1319,37 @@ class ObjCMethod(Node):
         self.emit_line_directive(f)
         f.write(self.text)
         f.write('\n\n')
+
+
+class ObjCProtocol(Node):
+
+    @classmethod
+    def _parse(cls, cursor):
+
+        self = ObjCProtocol()
+
+        self.name = None
+
+        # Parse head
+        assert cursor.text == '@protocol'
+        cursor.next()
+
+        self.name = cursor.text
+        cursor.next()
+
+        while cursor.text != '@end':
+            cursor.next()
+        cursor.next()
+
+        self.defined_names = [self.name]
+
+        return self
+
+    def emit_interface(self, f):
+        f.write('\n')
+        f.write(self.line_directive)
+        f.write(self.text)
+        f.write('\n')
 
 
 class ObjCClass(Node):
@@ -1252,10 +1443,12 @@ class ObjCClass(Node):
         f.write('@class %s;\n' % self.name)
         
     def emit_interface(self, f):
-        f.write(self.head.text_with_line_directive)
+        self.head.emit_line_directive(f)
+        f.write(self.head.text)
         f.write('\n\n')
         for prop in self.properties:
-            f.write(prop.text_with_line_directive)
+            prop.emit_line_directive(f)
+            f.write(prop.text)
             f.write('\n\n')
         for method in self.methods:
             method.emit_interface(f)
@@ -1287,6 +1480,8 @@ class ObjCClass(Node):
 def parse_declaration(cursor):
     if cursor.text == '@interface':
         return ObjCClass.parse(cursor)
+    elif cursor.text == '@protocol':
+        return ObjCProtocol.parse(cursor)
     elif cursor.text == 'namespace':
         return NamespaceDeclaration.parse(cursor)
     else:
@@ -1294,12 +1489,11 @@ def parse_declaration(cursor):
 
 
 class Database:
-    def __init__(self, input_paths, source_path, header_path, includes, debug_lexer):
-        self.input_paths = input_paths
-        self.source_path = source_path
-        self.header_path = header_path
-        self.includes = includes
+    def __init__(self, debug_lexer, debug_syntax):
         self.debug_lexer = debug_lexer
+        self.debug_syntax = debug_syntax
+        self.includes = []
+        self.decls = []
 
     def emit_interfaces(self, f):
 
@@ -1313,58 +1507,92 @@ class Database:
         f.write('\n')
 
         for decl in self.decls:
+            decl.emit_typedefs(f)
+        f.write('\n')
+
+        for decl in self.decls:
             decl.emit_interface(f)
+        f.write('\n')
+
+        for decl in self.decls:
+            decl.emit_inline_function_definitions(f)
         f.write('\n')
 
     def emit_implementations(self, f):
         for decl in self.decls:
             decl.emit_implementation(f)
 
-    def parse(self):
-        self.decls = []
-        for path in self.input_paths:
+    def parse_input(self, path):
+        local.RecordScope = []
 
-            tokens = Lexer(path)
+        tokens = Lexer(path)
 
-            manual_deps = []
+        manual_deps = []
+        decls = []
 
-            if self.debug_lexer:
-                cursor = Cursor(tokens, 0)
-                while cursor:
-                    token = cursor.token
-                    print(str(token.line).ljust(5), token.type.ljust(12), token.text, file=sys.stderr)
-                    cursor.next()
-
-
+        if self.debug_lexer:
             cursor = Cursor(tokens, 0)
             while cursor:
+                token = cursor.token
+                print(str(token.line).ljust(5), token.type.ljust(12), token.text, file=sys.stderr)
+                cursor.next()
 
-                while cursor.text == '#depends':
-                    cursor.next()
-                    manual_deps.append(cursor.text)
-                    cursor.next()
 
-                decl = parse_declaration(cursor)
-                decl.manual_deps = manual_deps
-                self.decls.append(decl)
+        cursor = Cursor(tokens, 0)
+        while cursor:
+
+            while cursor.text == '#pragma':
+                cursor.next()
+                if cursor.text != 'depends':
+                    cursor.error("Unrecognized #pragma: '%s'" % cursor.text)
+                cursor.next()
+                manual_deps.append(cursor.text)
+                cursor.next()
+
+            decl = parse_declaration(cursor)
+            decl.manual_deps = manual_deps
+            decls.append(decl)
+
+            if self.debug_syntax:
+                decl.dump()
+
+        return decls
+
+    def parse(self, input_paths, manifest_path):
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            decl_lists = list(pool.map(self.parse_input, input_paths))
+
+        for decl_list in decl_lists:
+            self.decls.extend(decl_list)
+
+        if manifest_path:
+            with open(manifest_path, 'wt') as f:
+                for path, decl_list in zip(input_paths, decl_lists):
+                    f.write(path + ':')
+                    for decl in decl_list:
+                        f.write(' ' + ' '.join(decl.defined_names))
+                    f.write('\n')
+                
+        
+
+    def emit_all(self, source_path, header_path, depinfo_path, includes):
+        self.includes = includes
+        self.depinfo_path = depinfo_path
 
         # Figure out interface dependencies
         self.sort_decls()
-        
-
-    def emit_all(self):
-        self.parse()
 
         # Parse all declarations
         # Emit output
-        if self.header_path:
-            with open(self.header_path, 'wt') as f:
+        if header_path:
+            with open(header_path, 'wt') as f:
                 f.write('#pragma once\n\n')
                 self.emit_interfaces(f)
 
-        if self.source_path:
-            with open(self.source_path, 'wt') as f:
-                if not self.header_path:
+        if source_path:
+            with open(source_path, 'wt') as f:
+                if not header_path:
                     self.emit_interfaces(f)
                     f.write('\n// -- IMPLEMENTATIONS --\n\n')
                 self.emit_implementations(f)
@@ -1390,6 +1618,16 @@ class Database:
         deps_by_decl = defaultdict(set)
         for a, b in decl_deps:
             deps_by_decl[b].add(a)
+
+        if self.depinfo_path:
+            with open(self.depinfo_path, 'wt') as f:
+                for b, a in deps_by_decl.items():
+                    for bn in b.defined_names:
+                        ans = []
+                        for ad in a:
+                            ans.extend(ad.defined_names)
+
+                        f.write(bn + ': ' + ' '.join(ans) + '\n')
 
         done = set()
         sorted_decls = []
@@ -1443,22 +1681,39 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-oc', metavar='PATH', help='Output source file')
     parser.add_argument('-oh', metavar='PATH', help='Output header file')
+    parser.add_argument('-od', metavar='PATH', help='Output dependency information')
+    parser.add_argument('-on', metavar='PATH', help='Output names declared in each file')
     parser.add_argument('-i', metavar='PATH', help='Includes to add to generated source', nargs='*')
+    parser.add_argument('-nl', action='store_true', help='Omit #line directives')
     parser.add_argument('inputs', nargs='+', help='Input files')
     
     debug = parser.add_argument_group('arguments used for debugging')
     debug.add_argument('-dt', action='store_true', help='Trace tokenization to stderr')
+    debug.add_argument('-ds', action='store_true', help='Trace syntax tree to stderr')
+    debug.add_argument('-dx', action='store_true', help='Print tracebacks on parse errors')
 
     args = parser.parse_args()
 
+    if args.nl:
+        global line_directives_enabled
+        line_directives_enabled = False
+        
     if args.oc is None and args.oh is None:
         parser.error('at least one of -oc and -oh must be specified.')
 
     try:
-        Database(args.inputs, args.oc, args.oh, args.i or [], args.dt).emit_all()
+        db = Database(args.dt, args.ds)
+        db.parse(args.inputs, args.on)
+        db.emit_all(args.oc, args.oh, args.od, args.i or [])
+
     except ParseError as e:
         print(e.args[0], file=sys.stderr)
-        sys.exit(1)
+        for item in e.record_scope:
+            print('While parsing ', item, file=sys.stderr)
+        if args.dx:
+            raise
+        else:
+            sys.exit(1)
 
 if __name__ == '__main__':
     main()
