@@ -120,7 +120,7 @@ class Token:
 
     @property
     def line_directive(self):
-        return '#line %i "%s"\n' % (self.line, self.path)
+        return '#line %i "%s"\n' % (self.line, self.path.replace('\\', '\\\\'))
         
     def __repr__(self):
         return '%s "%s"' % (self.type, self.text)
@@ -1055,6 +1055,9 @@ class Declaration(Node):
             record.emit_inline_function_definitions(f)
 
     def emit_interface(self, f):
+        if self.specifier.is_constexpr:
+            f.write(self.text + '\n\n')
+            return
 
         # If this is a function:
         if self.function_body:
@@ -1190,6 +1193,9 @@ class Declaration(Node):
         f.write('\n\n')
         
     def emit_implementation(self, f):
+        if self.specifier.is_constexpr:
+            return
+
         if self.function_body:
             if not self.is_inline_or_template_function:
                 self.emit_function_definition(f)
