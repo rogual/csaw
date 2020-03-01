@@ -1107,7 +1107,7 @@ class Declaration(Node):
         self.emit_line_directive(f)
         f.write('extern %s' % self.specifier.text)
         for decl in self.declarators:
-            text = re.sub('=.*', '', decl.text)
+            text = re.sub('=.*', '', decl.text, flags=re.DOTALL)
             text = re.sub(r'\(.*?\)', '', text)
             f.write(' %s' % text)
         f.write(';\n')
