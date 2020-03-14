@@ -406,13 +406,8 @@ class BaseRecord(Node):
             elif cursor.type == TWord:
                 if self.name:
                     cursor.error('Unexpected "%s"' % cursor.text)
-                self.name = cursor.text
-                cursor.next()
-
-            elif cursor.text == '<':
-                if self.template_params:
-                    cursor.error("Extra template paramter list")
-                self.template_params = TemplateParams.parse(cursor)
+                self.name = Name.parse(cursor)
+                self.template_params = self.name.template_params
 
             else:
                 if self.name:
