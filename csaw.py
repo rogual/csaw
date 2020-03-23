@@ -472,6 +472,7 @@ class Name(Node):
         self.template_params = None
 
         another = True
+        first = True
 
         while cursor:
             if another and cursor.type == TWord:
@@ -481,7 +482,7 @@ class Name(Node):
                 cursor.next()
 
             elif cursor.text == '::':
-                if another:
+                if another and not first:
                     cursor.error("Repeated '::'")
                 another = True
                 cursor.next()
@@ -495,6 +496,7 @@ class Name(Node):
                 if not self.identifier:
                     cursor.error("Expected a name")
                 return self
+            first = False
 
 
 class RecordDefinition(Node):
@@ -594,8 +596,8 @@ class RecordDefinition(Node):
         deps = set()
         if self.bases:
             for base in self.bases:
-                if base.name in names:
-                    deps.add(base.name)
+                if len(base.name.scope) == 1 and base.name.identifier in names:
+                    deps.add(base.name.identifier)
 
         for child in self.children:
             deps = deps | child.get_dependencies(names)
@@ -722,7 +724,7 @@ class Specifier(Node):
                 # This must be a conversion operator; stop parsing the specifier
                 return self
 
-            elif cursor.type == TWord:
+            elif cursor.type == TWord or cursor.text == '::':
                 # If this is a constructor, stop parsing the specifier
                 if local.RecordScope and cursor.text == local.RecordScope[-1].name:
                     next_cursor = cursor.copy()
