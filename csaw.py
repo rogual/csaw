@@ -654,6 +654,7 @@ class Specifier(Node):
         self.is_virtual = False
         self.is_inline = False
         self.is_constexpr = False
+        self.is_extern_c = False
         self.attributes = []
 
         while cursor:
@@ -707,6 +708,13 @@ class Specifier(Node):
                     cursor.next()
                 else:
                     cursor.error('Repeated "constexpr"')
+
+            elif cursor.text == 'extern':
+                cursor.next()
+                if cursor.text != '"C"':
+                    cursor.error('extern "C" is the only supported use of extern')
+                cursor.next()
+                self.is_extern_c = True
 
             elif cursor.text == 'template':
                 cursor.next()
