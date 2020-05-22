@@ -654,6 +654,7 @@ class Specifier(Node):
         self.is_virtual = False
         self.is_inline = False
         self.is_constexpr = False
+        self.is_explicit = False
         self.is_extern_c = False
         self.attributes = []
 
@@ -673,6 +674,13 @@ class Specifier(Node):
                     cursor.next()
                 else:
                     cursor.error('Repeated "const"')
+
+            elif cursor.text == 'explicit':
+                if not self.is_explicit:
+                    self.is_explicit = True
+                    cursor.next()
+                else:
+                    cursor.error('Repeated "explicit"')
 
             elif cursor.text == 'static':
                 if not self.is_static:
@@ -1178,7 +1186,7 @@ class Declaration(Node):
         self.emit_line_directive(f)
 
         for token in self.specifier.range.tokens:
-            if token.text not in ['virtual', 'static']:
+            if token.text not in ['virtual', 'static', 'explicit']:
                 f.write(token.text_with_whitespace)
 
         declarator, = self.declarators
