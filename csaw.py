@@ -4,12 +4,11 @@
 
 TODO:
   namespace
-    just spaff contents
+    Splitting a namespace over several files isn't supported
+    yet. Shouldn't be too hard, I just never use it.
 
-  template c, f
-    spaff into header
-
-    could be smarter and actually split out fndefs
+  template class
+    could be smarter and actually split out member fndefs
     probably no point for now
 
 Areas where csaw needs some help:
@@ -21,7 +20,8 @@ Areas where csaw needs some help:
     No way of knowing whether template params need to be fully
     defined or not. We just assume they do.
 
-    #pragma depends<T> vector<T> T
+    Idea: Maybe introduce something like
+        #pragma depends<T> vector<T> T
 
 Preprocessor
    Not supported. Preprocess your files before csaw sees them. One
