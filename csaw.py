@@ -27,6 +27,10 @@ Preprocessor
    Not supported. Preprocess your files before csaw sees them. One
    custom directive is supported, #pragma depends, which marks all items
    in a file as depending on a specific name.
+
+Qt
+    Pass -qt and Q_OBJECT will be recognized. This makes the emitted
+    source file suitable for processing with moc.
 """
 
 from typing import List
@@ -43,6 +47,7 @@ import argparse
 from collections import defaultdict
 
 line_directives_enabled = True
+qt_enabled = False
 
 
 def fatal(msg):
@@ -72,7 +77,6 @@ def append(xs, x):
     xs.append(x)
     yield
     xs.pop()
-    
 
 
 class Token:
@@ -510,6 +514,7 @@ class RecordDefinition(Node):
         self.name = None
         self.bases = None
         self.children = []
+        self.is_q_object = False
 
         self.head = TokenRange(cursor)
 
@@ -581,6 +586,10 @@ class RecordDefinition(Node):
                         label = AccessLabel.parse(cursor)
                         self.children.append(label)
 
+                    elif qt_enabled and cursor.text == 'Q_OBJECT':
+                        self.is_q_object = True
+                        cursor.next()
+
                     else:
                         decl = Declaration.parse(cursor)
                         assert decl
@@ -622,6 +631,9 @@ class RecordDefinition(Node):
             self.head.emit_line_directive(f)
             f.write(self.head.text)
             f.write('\n')
+
+            if self.is_q_object:
+                f.write('Q_OBJECT\n\n')
 
             with append(local.RecordScope, self.name):
                 for child in self.children:
@@ -1715,6 +1727,7 @@ def main():
     parser.add_argument('-on', metavar='PATH', help='Output names declared in each file')
     parser.add_argument('-i', metavar='PATH', help='Includes to add to generated source', nargs='*')
     parser.add_argument('-nl', action='store_true', help='Omit #line directives')
+    parser.add_argument('-qt', help='Enable Qt extensions')
     parser.add_argument('inputs', nargs='+', help='Input files')
     
     debug = parser.add_argument_group('arguments used for debugging')
@@ -1727,6 +1740,10 @@ def main():
     if args.nl:
         global line_directives_enabled
         line_directives_enabled = False
+
+    if args.qt:
+        global qt_enabled
+        qt_enabled = True
         
     if args.oc is None and args.oh is None:
         parser.error('at least one of -oc and -oh must be specified.')
