@@ -1017,7 +1017,18 @@ class Declaration(Node):
             cursor.next()
             return self
 
-        declarator = Declarator.parse(cursor)
+        try:
+            declarator = Declarator.parse(cursor)
+
+        # Handy diagnostic for misnamed ctors
+        except ParseError as e:
+            if '()' in str(e) and local.RecordScope:
+                expected_name = local.RecordScope[-1].name
+                got_name = self.specifier.name.text
+                cursor.error('Constructor must be called %s, not %s' % (expected_name, got_name))
+            else:
+                raise
+
         self.declarators.append(declarator)
 
         if cursor.text == ':':
