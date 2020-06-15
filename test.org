@@ -1,0 +1,120 @@
+* variable
+** uninitialized
+*** in
+    int a;
+*** source
+    int a;
+*** header
+    extern int a;
+** initialized
+*** in
+int a = 3;
+*** source
+int a = 3;
+*** header
+extern int a;
+** multi
+*** in
+    int a = 3, b, *c, d = 47;
+*** source
+    int a = 3, b, *c, d=47;
+*** header
+    extern int a, b, *c, d;
+
+* typedef
+** simple
+*** in
+    typedef int a;
+*** header
+    typedef int a;
+** multi
+*** in
+    typedef int a, *b;
+*** header
+    typedef int a, *b;
+
+* struct
+** simple
+*** in
+struct Thing { int a, b; char *c; };
+*** header
+struct Thing;
+struct Thing { int a, b; char *c; };
+
+* typedef struct
+** simple
+*** in
+typedef struct b { int a; } b;
+*** header
+struct b;
+typedef struct b { int a; } b;
+
+* union
+** simple
+*** in
+    union Thing { int a, b; char *c; };
+*** header
+    union Thing;
+    union Thing { int a, b; char *c; };
+
+* typedef union
+** simple
+*** in
+    typedef union Thing { int a, b; char *c; } d;
+*** header
+    union Thing;
+    typedef union Thing { int a, b; char *c; } d;
+
+* enum
+** normal
+*** in
+enum MyEnum { a, b, c=3, d };
+*** header
+enum MyEnum { a, b, c=3, d };
+** anonymous
+*** in
+    enum { a, b, c=3, d };
+*** header
+    enum { a, b, c=3, d };
+
+* function
+** simple
+*** in
+int fn(int a, char *b[]) {
+  anything() !! notEvenReallyParsed(); <qqq>
+  }
+*** header
+int fn(int a, char *b[]);
+*** source
+int fn(int a, char *b[]) {
+    anything() !! notEvenReallyParsed(); <qqq>
+}
+
+* template struct
+** simple
+*** in
+template<class T, class U>
+struct S {
+  int q;
+  int f() { return q; }
+};
+*** header
+template<class T, class U>
+struct S {
+    int q;
+    int f() { return q; }
+};
+
+* template function
+** simple
+*** in
+template<class T, class U>
+T f(U a) {
+    return a;
+}
+*** header
+template<class T, class U> T f(U a);
+template<class T, class U>
+T f(U a) {
+    return a;
+}

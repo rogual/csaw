@@ -73,6 +73,14 @@ local.RecordScope = []
 
 
 @contextlib.contextmanager
+def to_file(path_or_file, mode):
+    if isinstance(path_or_file, str):
+        with open(path_or_file, mode) as f:
+            yield f
+    else:
+        yield path_or_file
+
+@contextlib.contextmanager
 def append(xs, x):
     xs.append(x)
     yield
@@ -151,9 +159,14 @@ class Lexer:
     line_directive_regex = re.compile('(\d+) "(.*)"')
 
     def __init__(self, input_path):
-        self.input_path = input_path
-        with open(input_path, 'rt') as f:
-            self.source_text = f.read()
+        if isinstance(input_path, str):
+            self.input_path = input_path
+            with open(input_path, 'rt') as f:
+                self.source_text = f.read()
+        else:
+            self.input_path = '<memory>'
+            self.source_text = input_path.read()
+
         source_length = len(self.source_text)
 
         # Build the line map
@@ -442,6 +455,8 @@ class AccessLabel(Node):
 
 class TemplateParams(Node):
 
+    dump_text = True
+
     @classmethod
     def _parse(cls, cursor):
 
@@ -510,7 +525,6 @@ class RecordDefinition(Node):
 
         self = RecordDefinition()
         self.record_kind = None
-        self.template_params = None
         self.name = None
         self.bases = None
         self.children = []
@@ -527,10 +541,6 @@ class RecordDefinition(Node):
                 else:
                     cursor.error('Unexpected "%s" after "%s"' % (cursor.text, self.record_kind))
                 cursor.next()
-
-            elif cursor.text == 'template':
-                cursor.next()
-                self.template_params = TemplateParams.parse(cursor)
 
             elif cursor.type == TWord:
                 if self.name is None:
@@ -614,18 +624,20 @@ class RecordDefinition(Node):
         return deps
 
     def emit_forward_declaration(self, f):
-
-        if self.template_params:
-            f.write('template %s ' % self.template_params.text)
-
         if self.record_kind in ['enum', 'enum class']:
             self.emit_line_directive(f)
-            f.write(self.text + ';')
+            f.write(self.text)
+            f.write(';\n')
         else:
             f.write('%s %s;\n' % (self.record_kind, self.name))
 
     def emit_interface(self, f):
-        if self.record_kind in ['enum', 'enum class']:
+        if self.record_kind in ['enum', 'enum class'] and local.RecordScope:
+            self.head.emit_line_directive(f)
+            f.write(self.text)
+            f.write('\n')
+
+        elif self.record_kind in ['enum', 'enum class'] and not local.RecordScope:
             pass
         else:
             self.head.emit_line_directive(f)
@@ -658,6 +670,7 @@ class Specifier(Node):
         self = Specifier()
         self.record_kind = None
         self.record_definition = None
+        self.record_start = None
         self.name = None
         self.template_params = None
         self.is_const = False
@@ -670,10 +683,13 @@ class Specifier(Node):
         self.is_extern_c = False
         self.attributes = []
 
+        record_start = None
+
         while cursor:
             if cursor.text in ['class', 'struct', 'union', 'enum']:
                 if self.record_kind is None:
                     self.record_kind = cursor.text
+                    record_start = cursor.copy()
                 elif self.record_kind == 'enum' and cursor.text == 'class':
                     self.record_kind = 'enum class'
                 else:
@@ -744,7 +760,7 @@ class Specifier(Node):
                 self.template_params = TemplateParams.parse(cursor)
 
             elif self.record_kind and cursor.text in [':', '{']:
-                cursor.set(start_cursor)
+                cursor.set(record_start)
                 self.record_definition = RecordDefinition.parse(cursor)
                 return self
 
@@ -977,6 +993,7 @@ class NamespaceDeclaration(Node):
         f.write('namespace %s {\n\n' % self.name)
 
         for child in self.children:
+            child.emit_forward_declaration(f)
             child.emit_typedefs(f)
             child.emit_interface(f)
 
@@ -1072,9 +1089,10 @@ class Declaration(Node):
         )
 
     def emit_forward_declaration(self, f):
-        record = self.specifier.record_definition
-        if record:
-            record.emit_forward_declaration(f)
+        if not self.specifier.template_params:
+            record = self.specifier.record_definition
+            if record:
+                record.emit_forward_declaration(f)
 
     def emit_typedefs(self, f):
         if self.specifier.is_typedef:
@@ -1116,9 +1134,11 @@ class Declaration(Node):
 
         record = self.specifier.record_definition
         if record:
+            pos = f.tell()
             record.emit_interface(f)
             f.write(', '.join(d.text for d in self.declarators))
-            f.write(';\n\n')
+            if f.tell() != pos:
+                f.write(';\n\n')
             return
 
         # If this is a record member: 
@@ -1145,9 +1165,11 @@ class Declaration(Node):
 
         self.emit_line_directive(f)
         f.write('extern %s' % self.specifier.text)
-        for decl in self.declarators:
+        for i, decl in enumerate(self.declarators):
             text = re.sub('=.*', '', decl.text, flags=re.DOTALL)
             text = re.sub(r'\(.*?\)', '', text)
+            if i != 0:
+                f.write(', ')
             f.write(' %s' % text)
         f.write(';\n')
 
@@ -1628,12 +1650,12 @@ class Database:
         # Parse all declarations
         # Emit output
         if header_path:
-            with open(header_path, 'wt') as f:
+            with to_file(header_path, 'wt') as f:
                 f.write('#pragma once\n\n')
                 self.emit_interfaces(f)
 
         if source_path:
-            with open(source_path, 'wt') as f:
+            with to_file(source_path, 'wt') as f:
                 if not header_path:
                     self.emit_interfaces(f)
                     f.write('\n// -- IMPLEMENTATIONS --\n\n')
@@ -1727,7 +1749,7 @@ def main():
     parser.add_argument('-on', metavar='PATH', help='Output names declared in each file')
     parser.add_argument('-i', metavar='PATH', help='Includes to add to generated source', nargs='*')
     parser.add_argument('-nl', action='store_true', help='Omit #line directives')
-    parser.add_argument('-qt', help='Enable Qt extensions')
+    parser.add_argument('-qt', action='store_true', help='Enable Qt extensions')
     parser.add_argument('inputs', nargs='+', help='Input files')
     
     debug = parser.add_argument_group('arguments used for debugging')
