@@ -200,11 +200,11 @@ class Lexer:
                             token.mapped_line_offset = mapped_line_offset
 
                     # Handle line directives
-                    if token and token.text == '#':
+                    if token and (token.text == '#' or token.text == '#line'):
 
                         line_end = self.source_text.find('\n', pos)
 
-                        if self.source_text[pos + 1] == ' ':
+                        if self.source_text[pos + len(token.text)] == ' ':
                             m = Lexer.line_directive_regex.search(
                                 self.source_text,
                                 pos,
