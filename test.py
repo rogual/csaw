@@ -96,7 +96,7 @@ for cat, test, in_, header, source in items():
     header = normalize(header)
 
     ok = True
-    print(cat, test, end=' ')
+    print(cat + ': ' + test, end=': ')
 
     if output_source != source:
         print('SOURCE differs:')

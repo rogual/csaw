@@ -6,13 +6,20 @@
     int a;
 *** header
     extern int a;
-** initialized
+** initialized with =
 *** in
 int a = 3;
 *** source
 int a = 3;
 *** header
 extern int a;
+** initialized with ()
+*** in
+    int a(3);
+*** source
+    int a(3);
+*** header
+    extern int a;
 ** multi
 *** in
     int a = 3, b, *c, d = 47;
@@ -90,20 +97,66 @@ int fn(int a, char *b[]) {
     anything() !! notEvenReallyParsed(); <qqq>
 }
 
+** default arguments
+*** in
+int fn(int a=1) {
+}
+*** header
+int fn(int a=1);
+*** source
+int fn(int a) {
+}
+
+
+* namespace
+** simple
+*** in
+    namespace ns {
+    int a;
+    void f() {}
+    struct q {
+    void m() {}
+    };
+    }
+*** header
+    namespace ns {
+    extern int a;
+    void f();
+    struct q;
+    struct q {
+    void m();
+    };
+    }
+*** source
+    namespace ns {
+    int a;
+    void f() {}
+    void q::m() {}
+    }
+* member function
+** simple
+*** in
+struct q { void f() {}};
+*** header
+struct q;
+struct q { void f(); };
+*** source
+void q::f() {}
+
 * template struct
 ** simple
 *** in
-template<class T, class U>
-struct S {
-  int q;
-  int f() { return q; }
-};
-*** header
-template<class T, class U>
-struct S {
+    template<class T, class U>
+    struct S {
     int q;
     int f() { return q; }
-};
+    };
+*** header
+    template<class T, class U>
+    struct S {
+    int q;
+    int f() { return q; }
+    };
 
 * template function
 ** simple
@@ -118,3 +171,73 @@ template<class T, class U>
 T f(U a) {
     return a;
 }
+
+* template member function
+** simple
+*** in
+struct q {
+    template<class T, class U>
+    T f(U a) {
+        return a;
+    }
+};
+*** header
+struct q;
+struct q {
+    template<class T, class U>
+    T f(U a);
+};
+*** source
+template<class T, class U>
+T q::f(U a) {
+    return a;
+}
+
+* typedef template
+** typedef before template
+*** in
+typedef S<int> Sint;
+template<class T> struct S {};
+*** header
+template<class T> struct S {};
+typedef S<int> Sint;
+** template before typedef
+*** in
+template<class T> struct S {};
+typedef S<int> Sint;
+*** header
+template<class T> struct S {};
+typedef S<int> Sint;
+
+* lambda in ()-assignment
+** basic
+*** in
+Thing myThing("hi", []() {});
+*** header
+extern Thing myThing;
+*** source
+Thing myThing("hi", []() {});
+** heavy
+*** in
+Thing myThing("hi", []() {
+   blah("poo");
+});
+*** header
+extern Thing myThing;
+*** source
+Thing myThing("hi", []() {
+    blah("poo");
+});
+** confusing
+*** in
+Thing myThing("hi", []() {
+    blah("))))");
+    int q = 4;
+});
+*** header
+extern Thing myThing;
+*** source
+Thing myThing("hi", []() {
+    blah("))))");
+    int q = 4;
+});

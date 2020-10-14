@@ -11,6 +11,13 @@ TODO:
     could be smarter and actually split out member fndefs
     probably no point for now
 
+  template member function
+    definition should go in header, not source
+
+  R"" strings and other c++11 weirdo strings
+
+  C++11 {}-initialization e.g. int a{4};
+
 Areas where csaw needs some help:
 
   Nested classes
@@ -33,30 +40,22 @@ Qt
     source file suitable for processing with moc.
 """
 
-from typing import List
+from collections import defaultdict
+
 import concurrent.futures
 import contextlib
 import threading
+import functools
+import argparse
 import string
 import array
 import sys
 import re
+import os
 
-import functools
-import argparse
-from collections import defaultdict
 
 line_directives_enabled = True
 qt_enabled = False
-
-
-def fatal(msg):
-    print('\n--- FATAL ERROR ---', file=sys.stderr)
-    for item in local.RecordScope:
-        print('While parsing ', item, file=sys.stderr)
-    print(msg, file=sys.stderr)
-    raise Exception(msg)
-    sys.exit(1)
 
 
 TComment = sys.intern('Comment')
@@ -72,6 +71,15 @@ local = threading.local()
 local.RecordScope = []
 
 
+def fatal(msg):
+    print('\n--- FATAL ERROR ---', file=sys.stderr)
+    for item in local.RecordScope:
+        print('While parsing ', item, file=sys.stderr)
+        print(msg, file=sys.stderr)
+    raise Exception(msg)
+    sys.exit(1)
+
+
 @contextlib.contextmanager
 def to_file(path_or_file, mode):
     if isinstance(path_or_file, str):
@@ -79,6 +87,7 @@ def to_file(path_or_file, mode):
             yield f
     else:
         yield path_or_file
+
 
 @contextlib.contextmanager
 def append(xs, x):
@@ -953,6 +962,23 @@ class Declarator(Node):
         
         return True
 
+    @property
+    def extern_text(self):
+        text = ''
+
+        # Remove balanced brackets
+        level = 0
+        for token in self.range.tokens:
+            if token.text in '({[': level += 1
+            elif token.text in ']})': level -= 1
+            elif level == 0:
+                text += token.text + ' '
+
+        # Remove =-assignment
+        text = re.sub('=.*', '', text, flags=re.DOTALL)
+
+        return text
+
 
 class NamespaceDeclaration(Node):
 
@@ -1009,12 +1035,23 @@ class NamespaceDeclaration(Node):
         f.write('}\n\n')
 
     def emit_inline_function_definitions(self, f):
+
+        start = f.tell()
+
         self.emit_line_directive(f)
         f.write('namespace %s {\n\n' % self.name)
+
+        check = f.tell()
 
         for child in self.children:
             child.emit_inline_function_definitions(f)
 
+        # Avoid empty ns if nothing got written
+        if f.tell() == check:
+            f.seek(start, os.SEEK_SET)
+            f.truncate()
+            return
+        
         f.write('}\n\n')
 
     @property
@@ -1113,6 +1150,10 @@ class Declaration(Node):
             f.write(self.text + '\n\n')
             return
 
+        #if self.specifier.is_typedef:
+        #    f.write(self.text)
+        #    f.write('\n')
+
         # If this is a function:
         if self.function_body:
             self.emit_function_declaration(f)
@@ -1156,21 +1197,12 @@ class Declaration(Node):
         if not self.declarators:
             raise Exception(self.line_directive)
 
-        # HACK
-        if self.specifier.text.endswith('Command'):
-            f.write('extern %s ' % self.specifier.text)
-            f.write(', '.join(d.name for d in self.declarators))
-            f.write(';\n')
-            return
-
         self.emit_line_directive(f)
         f.write('extern %s' % self.specifier.text)
         for i, decl in enumerate(self.declarators):
-            text = re.sub('=.*', '', decl.text, flags=re.DOTALL)
-            text = re.sub(r'\(.*?\)', '', text)
             if i != 0:
                 f.write(', ')
-            f.write(' %s' % text)
+            f.write(' %s' % decl.extern_text)
         f.write(';\n')
 
     def emit_function_declaration(self, f):
@@ -1236,7 +1268,18 @@ class Declaration(Node):
 
         declarator, = self.declarators
         scoped = False
+        skip_default_arg = False
         for token in declarator.range.tokens:
+
+            if token.text == '=':
+                skip_default_arg = True
+
+            if skip_default_arg:
+                if token.text in [',', ')']:
+                    skip_default_arg = False
+                else:
+                    continue
+                
             if token.text != 'override':
                 if (not scoped) and (token.text == declarator.name or token.text == '~'):
                     f.write('::'.join(local.RecordScope + ['']))
