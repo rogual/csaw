@@ -28,17 +28,38 @@ extern int a;
 *** header
     extern int a, b, *c, d;
 
+** multiword type
+*** in
+long long int a = 1;
+*** source
+long long int a = 1;
+*** header
+extern long long int a;
+
+** array
+*** in
+int a[64];
+*** source
+int a[64];
+*** header
+extern int a[64];
+
 * typedef
 ** simple
 *** in
-    typedef int a;
+typedef int a;
 *** header
-    typedef int a;
+typedef int a;
 ** multi
 *** in
-    typedef int a, *b;
+typedef int a, *b;
 *** header
-    typedef int a, *b;
+typedef int a, *b;
+** unusual spelling
+*** in
+int typedef long a;
+*** header
+int typedef long a;
 
 * struct
 ** simple
@@ -241,3 +262,29 @@ Thing myThing("hi", []() {
     blah("))))");
     int q = 4;
 });
+* operators
+** assignment
+*** in
+struct S {
+S &operator=(const S &) {}
+};
+*** header
+struct S;
+struct S {
+S &operator=(const S &);
+};
+*** source
+S &S::operator=(const S &) {}
+
+** conversion
+*** in
+struct S {
+operator int() { return 4; }
+};
+*** header
+struct S;
+struct S {
+    operator int();
+};
+*** source
+S::operator int() { return 4; }

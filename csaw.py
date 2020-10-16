@@ -969,13 +969,14 @@ class Declarator(Node):
         # Remove balanced brackets
         level = 0
         for token in self.range.tokens:
-            if token.text in '({[': level += 1
-            elif token.text in ']})': level -= 1
+            if (token.text == '(' or (level > 0 and token.text in '{[')): level += 1
+            elif level != 0 and token.text in ']})': level -= 1
             elif level == 0:
                 text += token.text + ' '
 
         # Remove =-assignment
-        text = re.sub('=.*', '', text, flags=re.DOTALL)
+        if 'operator' not in text:
+            text = re.sub('=.*', '', text, flags=re.DOTALL)
 
         return text
 
@@ -1269,9 +1270,13 @@ class Declaration(Node):
         declarator, = self.declarators
         scoped = False
         skip_default_arg = False
+        in_arg_list = False
         for token in declarator.range.tokens:
 
-            if token.text == '=':
+            if token.text == '(':
+                in_arg_list = True
+
+            if token.text == '=' and in_arg_list:
                 skip_default_arg = True
 
             if skip_default_arg:
