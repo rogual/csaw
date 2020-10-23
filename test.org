@@ -288,3 +288,37 @@ struct S {
 };
 *** source
 S::operator int() { return 4; }
+
+* __declspec(property)
+** read-only
+*** in
+struct S {
+    int getX() { return 42; }
+    __declspec(property(get=getX)) int x;
+};
+*** header
+struct S;
+struct S {
+    int getX();
+    __declspec(property(get=getX)) int x;
+};
+*** source
+int S::getX() { return 42; }
+
+** read-write
+*** in
+struct S {
+    int getX() { return 42; }
+    void setX(int x) {}
+    __declspec(property(get=getX,put=setX)) int x;
+};
+*** header
+struct S;
+struct S {
+    int getX();
+    void setX(int x);
+    __declspec(property(get=getX, put=setX)) int x;
+};
+*** source
+int S::getX() { return 42; }
+void S::setX(int x) {}
