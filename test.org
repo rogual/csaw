@@ -289,6 +289,65 @@ struct S {
 *** source
 S::operator int() { return 4; }
 
+** multiply (member)
+*** in
+struct S {
+    int operator*(int i) { return 4; }
+};
+
+*** header
+struct S;
+struct S {
+    int operator*(int i);
+};
+
+*** source
+int S::operator*(int i) { return 4; }
+
+** multiply (non-member)
+*** in
+struct S {
+};
+
+int operator*(int i, S &s) { return 4; }
+
+*** header
+struct S;
+struct S {
+};
+
+int operator*(int i, S &s);
+
+*** source
+int operator*(int i, S &s) { return 4; }
+
+* typedef dependencies
+** param
+*** in
+struct S {};
+void f(T) {}
+typedef S T;
+*** header
+struct S;
+struct S {};
+typedef S T;
+void f(T);
+*** source
+void f(T) {}
+
+** return
+*** in
+struct S {};
+T f() { return T(); }
+typedef S T;
+*** header
+struct S;
+struct S {};
+typedef S T;
+T f();
+*** source
+T f() { return T(); }
+
 * __declspec(property)
 ** read-only
 *** in

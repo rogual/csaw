@@ -408,7 +408,7 @@ class Node:
     def emit_inline_function_definitions(self, f):
         pass
 
-    def get_dependencies(self, names):
+    def get_dependencies(self, names, typedef_names):
         return set()
 
 
@@ -620,7 +620,7 @@ class RecordDefinition(Node):
 
         return self
 
-    def get_dependencies(self, names):
+    def get_dependencies(self, names, typedef_names):
         deps = set()
         if self.bases:
             for base in self.bases:
@@ -628,7 +628,7 @@ class RecordDefinition(Node):
                     deps.add(base.name.identifier)
 
         for child in self.children:
-            deps = deps | child.get_dependencies(names)
+            deps = deps | child.get_dependencies(names, typedef_names)
 
         return deps
 
@@ -1059,10 +1059,10 @@ class NamespaceDeclaration(Node):
     def defined_names(self):
         return [self.name]
 
-    def get_dependencies(self, names):
+    def get_dependencies(self, names, typedef_names):
         deps = set()
         for child in self.children:
-            deps = deps | child.get_dependencies(names)
+            deps = deps | child.get_dependencies(names, typedef_names)
         deps |= set(self.manual_deps)
         return deps
 
@@ -1133,9 +1133,10 @@ class Declaration(Node):
                 record.emit_forward_declaration(f)
 
     def emit_typedefs(self, f):
-        if self.specifier.is_typedef:
-            f.write(self.text)
-            f.write('\n')
+        #if self.specifier.is_typedef:
+        #    f.write(self.text)
+        #    f.write('\n')
+        pass
 
     def emit_inline_function_definitions(self, f):
         if self.is_inline_or_template_function:
@@ -1151,9 +1152,9 @@ class Declaration(Node):
             f.write(self.text + '\n\n')
             return
 
-        #if self.specifier.is_typedef:
-        #    f.write(self.text)
-        #    f.write('\n')
+        if self.specifier.is_typedef:
+            f.write(self.text)
+            f.write('\n')
 
         # If this is a function:
         if self.function_body:
@@ -1338,12 +1339,12 @@ class Declaration(Node):
         for declarator in self.declarators:
             yield declarator.name
 
-    def get_dependencies(self, names):
+    def get_dependencies(self, names, typedef_names):
         r = set()
 
         record = self.specifier.record_definition
         if record:
-            r = r | record.get_dependencies(names)
+            r = r | record.get_dependencies(names, typedef_names)
 
         # Does the specifier refer to a name?
         spec_deps = set()
@@ -1369,6 +1370,27 @@ class Declaration(Node):
                 for d in self.declarators
             ):
                 r = r | spec_deps
+
+
+        # If any of them are typedefs, it's a dependency
+        r = r | (spec_deps & typedef_names)
+
+
+        # Normally, function arguments do not create interface dependencies to their
+        # types (a forward declaration is enough). But, for typedefs, we depend on the typedef.
+        if typedef_names:
+
+            declarator_words = set(
+                token.text
+                for declarator in self.declarators
+                for token in declarator.range.tokens
+                if token.type == TWord
+            )
+
+            used_typedefs = typedef_names & declarator_words
+            if used_typedefs:
+                r |= used_typedefs
+            
 
         r |= set(self.manual_deps)
 
@@ -1577,14 +1599,14 @@ class ObjCClass(Node):
     def defined_names(self):
         return [self.name]
 
-    def get_dependencies(self, names):
+    def get_dependencies(self, names, typedef_names):
         deps = set()
         if self.base:
             if self.base in names:
                 deps.add(self.base)
 
         for child in self.children:
-            deps = deps | child.get_dependencies(names)
+            deps = deps | child.get_dependencies(names, typedef_names)
 
         return deps
 
@@ -1713,16 +1735,20 @@ class Database:
         decls = self.decls
 
         names = set()
+        typedef_names = set()
         decls_by_name = defaultdict(set)
         for decl in decls:
             for name in decl.defined_names:
                 names.add(name)
                 decls_by_name[name].add(decl)
 
+                if isinstance(decl, Declaration) and decl.specifier.is_typedef:
+                    typedef_names.add(name)
+
         decl_deps = set()
         for decl in decls:
             for name in decl.defined_names:
-                for dep in decl.get_dependencies(names):
+                for dep in decl.get_dependencies(names, typedef_names):
                     for dep_decl in decls_by_name[dep]:
                         if dep_decl is not decl:
                             decl_deps.add((dep_decl, decl))
