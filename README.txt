@@ -206,6 +206,22 @@ in this case, though we could probably have csaw take hints
 on what to do for a particular template.
 
 
+Fast Incremental Compiles
+-------------------------
+
+all.h: src/*.cc
+       csaw -oh $@.1 $^
+       cp -n $@.1 $@
+
+all.pch: all.h
+       $(MAKE_PCH) -o $@ $<
+
+%.mod.cc: src/%.cc all.pch
+       csaw -oc $@ $<
+
+%.o: $.mod.cc:
+     $(CC) -c -o $@ $<
+
 Q&A
 ---
 
