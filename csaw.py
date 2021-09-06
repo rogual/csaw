@@ -1237,9 +1237,6 @@ class Declaration(Node):
 
     def emit_static_member_vars_implementation(self, f):
 
-        if self.specifier.is_constexpr:
-            return
-
         self.emit_line_directive(f)
 
         for token in self.specifier.range.tokens:
@@ -1253,6 +1250,8 @@ class Declaration(Node):
                 
             scoped = False
             for token in declarator.range.tokens:
+                if self.specifier.is_constexpr and token.text == '=':
+                    break
                 if (not scoped) and token.text == declarator.name:
                     f.write('::'.join(local.RecordScope + ['']))
                     scoped = True
@@ -1300,7 +1299,8 @@ class Declaration(Node):
         f.write('\n\n')
         
     def emit_implementation(self, f):
-        if self.specifier.is_constexpr:
+
+        if self.specifier.is_constexpr and not self.specifier.is_static:
             return
 
         if self.function_body:

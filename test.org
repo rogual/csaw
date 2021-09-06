@@ -381,3 +381,23 @@ struct S {
 *** source
 int S::getX() { return 42; }
 void S::setX(int x) {}
+
+* constexpr
+** simple
+*** in
+constexpr int x = 4;
+*** header
+constexpr int x = 4;
+* static constexpr member
+** simple
+*** in
+struct S {
+    static constexpr int x = 4;
+};
+*** header
+struct S;
+struct S {
+    static constexpr int x = 4;
+};
+*** source
+constexpr int S::x;
