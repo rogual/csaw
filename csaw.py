@@ -23,6 +23,10 @@ Areas where csaw needs some help:
   Nested classes
     Use #pragma depends Parent if you use Parent::x
 
+  Return nested type
+    Always fully-qualify return types, e.g. 
+    class C { struct T {}; C::T f() {} };
+
   Templates
     No way of knowing whether template params need to be fully
     defined or not. We just assume they do.

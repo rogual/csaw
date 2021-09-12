@@ -464,6 +464,19 @@ int operator*(int i, S &s);
 *** source
 int operator*(int i, S &s) { return 4; }
 
+** call
+*** in
+struct S {
+S &operator()(const S &) {}
+};
+*** header
+struct S;
+struct S {
+S &operator()(const S &);
+};
+*** source
+S &S::operator()(const S &) {}
+
 * typedef dependencies
 ** param
 *** in
