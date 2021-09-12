@@ -990,6 +990,7 @@ class NamespaceDeclaration(Node):
 
         self = NamespaceDeclaration()
         self.children = []
+        self.manual_deps = []
 
         assert cursor.text == 'namespace'
 
