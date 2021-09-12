@@ -771,11 +771,11 @@ class Specifier(Node):
             elif self.record_kind and cursor.text in [':', '{']:
                 cursor.set(record_start)
                 self.record_definition = RecordDefinition.parse(cursor)
-                return self
+                break
 
             elif cursor.text == 'operator':
                 # This must be a conversion operator; stop parsing the specifier
-                return self
+                break
 
             elif cursor.type == TWord or cursor.text == '::':
                 # If this is a constructor, stop parsing the specifier
@@ -783,17 +783,17 @@ class Specifier(Node):
                     next_cursor = cursor.copy()
                     next_cursor.next()
                     if next_cursor.text == '(':
-                        return self
+                        break
 
                 if self.name is None:
                     self.name = Name.parse(cursor)
                 else:
                     # We already have a name; this name must be the first declarator
-                    return self
+                    break
 
             elif cursor.text == '~':
                 # This is a destructor; stop parsing the specifier
-                return self
+                break
 
             elif cursor.text == '[[':
                 cursor.next()
@@ -807,8 +807,10 @@ class Specifier(Node):
 
             else:
                 if self.record_kind or self.name:
-                    return self
+                    break
                 cursor.error("Unexpected specifier component '%s'" % cursor.text)
+
+        return self
 
 
 class FunctionBody(Node):
@@ -1148,7 +1150,14 @@ class Declaration(Node):
             record.emit_inline_function_definitions(f)
 
     def emit_interface(self, f):
+
         if self.specifier.is_constexpr:
+
+            # As a convenience, we allow omission of "static" on a member
+            # constexpr var, because they always must be static.
+            if local.RecordScope and not self.specifier.is_static:
+                f.write('static ')
+
             f.write(self.text + '\n\n')
             return
 
@@ -1300,15 +1309,19 @@ class Declaration(Node):
         
     def emit_implementation(self, f):
 
-        if self.specifier.is_constexpr and not self.specifier.is_static:
+        if self.specifier.is_constexpr and not local.RecordScope:
             return
-
+        
         if self.function_body:
             if not self.is_inline_or_template_function:
                 self.emit_function_definition(f)
             return
 
         if self.specifier.is_static:
+            self.emit_static_member_vars_implementation(f)
+            return
+
+        if self.specifier.is_constexpr and local.RecordScope:
             self.emit_static_member_vars_implementation(f)
             return
 
