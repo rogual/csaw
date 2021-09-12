@@ -396,9 +396,6 @@ class Node:
     def emit_forward_declaration(self, f):
         pass
 
-    def emit_typedefs(self, f):
-        pass
-
     def emit_interface(self, f):
         pass
 
@@ -658,7 +655,6 @@ class RecordDefinition(Node):
 
             with append(local.RecordScope, self.name):
                 for child in self.children:
-                    child.emit_typedefs(f)
                     child.emit_interface(f)
 
             f.write('}')
@@ -1024,7 +1020,6 @@ class NamespaceDeclaration(Node):
 
         for child in self.children:
             child.emit_forward_declaration(f)
-            child.emit_typedefs(f)
             child.emit_interface(f)
 
         f.write('}\n\n')
@@ -1134,12 +1129,6 @@ class Declaration(Node):
             record = self.specifier.record_definition
             if record:
                 record.emit_forward_declaration(f)
-
-    def emit_typedefs(self, f):
-        #if self.specifier.is_typedef:
-        #    f.write(self.text)
-        #    f.write('\n')
-        pass
 
     def emit_inline_function_definitions(self, f):
         if self.is_inline_or_template_function:
@@ -1270,7 +1259,6 @@ class Declaration(Node):
         f.write(';\n\n')
 
     def emit_function_definition(self, f):
-
         self.emit_line_directive(f)
 
         for token in self.specifier.range.tokens:
@@ -1652,10 +1640,6 @@ class Database:
             
         for decl in self.decls:
             decl.emit_forward_declaration(f)
-        f.write('\n')
-
-        for decl in self.decls:
-            decl.emit_typedefs(f)
         f.write('\n')
 
         for decl in self.decls:
