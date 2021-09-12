@@ -1832,7 +1832,7 @@ def unindent(text):
     return text
 
 
-def main():
+def get_argument_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('-oc', metavar='PATH', help='Output source file')
     parser.add_argument('-oh', metavar='PATH', help='Output header file')
@@ -1848,8 +1848,10 @@ def main():
     debug.add_argument('-ds', action='store_true', help='Trace syntax tree to stderr')
     debug.add_argument('-dx', action='store_true', help='Print tracebacks on parse errors')
 
-    args = parser.parse_args()
+    return parser
 
+
+def parse_to_db(args):
     if args.nl:
         global line_directives_enabled
         line_directives_enabled = False
@@ -1857,15 +1859,10 @@ def main():
     if args.qt:
         global qt_enabled
         qt_enabled = True
-        
-    if args.oc is None and args.oh is None:
-        parser.error('at least one of -oc and -oh must be specified.')
 
     try:
         db = Database(args.dt, args.ds)
         db.parse(args.inputs, args.on)
-        db.emit_all(args.oc, args.oh, args.od, args.i or [])
-
     except ParseError as e:
         print(e.args[0], file=sys.stderr)
         for item in e.record_scope:
@@ -1874,6 +1871,20 @@ def main():
             raise
         else:
             sys.exit(1)
+
+    return db
+
+
+def main():
+    parser = get_argument_parser()
+    args = parser.parse_args()
+
+    if args.oc is None and args.oh is None:
+        parser.error('at least one of -oc and -oh must be specified.')
+
+    db = parse_to_db(args)
+    db.emit_all(args.oc, args.oh, args.od, args.i or [])
+    return db
 
 if __name__ == '__main__':
     main()
