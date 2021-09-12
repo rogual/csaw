@@ -96,23 +96,37 @@ for cat, test, in_, header, source in items():
     header = normalize(header)
 
     ok = True
-    print(cat + ': ' + test, end=': ')
+    title = cat + ': ' + test + ':'
 
-    if output_source != source:
-        print('SOURCE differs:')
-        print(source)
-        print('----')
-        print(output_source)
-        ok = False
+    expect_fail = test.startswith('TODO ')
 
-    if output_header != header:
-        print('HEADER differs:')
-        print(header)
-        print('----')
-        print(output_header)
-        ok = False
+    matches = output_source == source and output_header == header
 
-    if ok:
-        print('OK')
+    if expect_fail:
+        if matches:
+            print('[FAIL]', title)
+            print('Test passed unexpectedly')
+            ok = False
+        else:
+            print('[TODO]', title)
+            ok = True
 
+    else:
+        if matches:
+            print('[ OK ]', title)
+        else:
+            print('[FAIL]', title)
+            if output_source != source:
+                print('SOURCE differs:')
+                print('Expected:', source)
+                print('----')
+                print('Got     :', output_source)
+                ok = False
+
+            if output_header != header:
+                print('HEADER differs:')
+                print('Expected:', header)
+                print('----')
+                print('Got     :', output_header)
+                ok = False
     

@@ -132,28 +132,85 @@ int fn(int a) {
 * namespace
 ** simple
 *** in
-    namespace ns {
+namespace ns {
     int a;
     void f() {}
     struct q {
-    void m() {}
+        void m() {}
     };
-    }
+}
 *** header
-    namespace ns {
+namespace ns {
     extern int a;
     void f();
     struct q;
     struct q {
-    void m();
+        void m();
     };
-    }
+}
 *** source
-    namespace ns {
+namespace ns {
     int a;
     void f() {}
     void q::m() {}
-    }
+}
+** reopened
+*** in
+namespace NS {
+    struct S {
+        void f() {}
+    };
+}
+namespace NS {
+    struct T {
+        void g() {}
+    };
+}
+*** header
+namespace NS {
+    struct S;
+    struct S {
+        void f();
+    };
+}
+namespace NS {
+    struct T;
+    struct T {
+        void g();
+    };
+}
+*** source
+namespace NS {
+    void S::f() {}
+}
+
+namespace NS {
+    void T::g() {}
+}
+** nested
+*** in
+namespace ns { namespace ns1 {
+    int a;
+    void f() {}
+    struct q {
+        void m() {}
+    };
+} }
+*** header
+namespace ns { namespace ns1 {
+    extern int a;
+    void f();
+    struct q;
+    struct q {
+        void m();
+    };
+} }
+*** source
+namespace ns { namespace ns1 {
+    int a;
+    void f() {}
+    void q::m() {}
+} }
 * member function
 ** simple
 *** in
@@ -213,6 +270,25 @@ template<class T, class U>
 T q::f(U a) {
     return a;
 }
+
+** TODO in template
+*** in
+template<class T>
+struct q {
+    template<class R, class A>
+    inline R f(A a) {
+        return a;
+    }
+};
+*** header
+template<class T>
+struct q {
+    template<class R, class A>
+    R f(A a) {
+        return a;
+    }
+};
+
 
 * typedef template
 ** typedef before template
