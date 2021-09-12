@@ -96,7 +96,7 @@ for cat, test, in_, header, source in items():
     header = normalize(header)
 
     ok = True
-    title = cat + ': ' + test + ':'
+    title = cat + ': ' + test
 
     expect_fail = test.startswith('TODO ')
 

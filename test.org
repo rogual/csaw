@@ -68,6 +68,15 @@ struct Thing { int a, b; char *c; };
 *** header
 struct Thing;
 struct Thing { int a, b; char *c; };
+** inheritance
+*** in
+struct Thing { int a, b; char *c; };
+struct Thang: Thing { float d; };
+*** header
+struct Thing;
+struct Thang;
+struct Thing { int a, b; char *c; };
+struct Thang: Thing { float d; };
 
 * typedef struct
 ** simple
@@ -221,6 +230,27 @@ struct q { void f(); };
 *** source
 void q::f() {}
 
+* virtual function
+** simple
+*** in
+class C {
+    virtual void f() = 0;
+};
+class D: C {
+    virtual void f() override {}
+};
+*** header
+class C;
+class D;
+class C {
+    virtual void f() = 0;
+};
+class D: C {
+    virtual void f() override;
+};
+*** source
+void D::f() {}
+
 * template struct
 ** simple
 *** in
@@ -289,7 +319,44 @@ struct q {
     }
 };
 
+* class
+** simple
+*** in
+class C { public: int p; protected: int pp; private: int ppp; };
+*** header
+class C;
+class C { public: int p; protected: int pp; private: int ppp; };
 
+** inheritance
+*** in
+class C {};
+class D: C {};
+class E: public C {};
+class F: protected C {};
+class G: private C {};
+*** header
+class C;
+class D;
+class E;
+class F;
+class G;
+class C {};
+class D: C {};
+class E: public C {};
+class F: protected C {};
+class G: private C {};
+
+* enum class
+** simple
+*** in
+enum class E { a, b=1, c };
+*** header
+enum class E { a, b=1, c };
+** typed
+*** in
+enum class E: int { a, b=1, c };
+*** header
+enum class E: int { a, b=1, c };
 * typedef template
 ** typedef before template
 *** in
@@ -489,3 +556,55 @@ struct S {
 };
 *** source
 constexpr int S::x;
+
+* extern "C"
+** variable
+*** in
+extern "C" int x;
+*** header
+extern "C" int x;
+*** source
+extern "C" int x;
+** function
+*** in
+extern "C" void f() {}
+*** header
+extern "C" void f();
+*** source
+extern "C" void f() {}
+
+* attribute
+** variable
+*** in
+[[MyAttr]] int x;
+*** header
+extern [[MyAttr]] int x;
+*** source
+[[MyAttr]] int x;
+
+** function
+*** in
+[[MyAttr]] void f() {}
+*** header
+[[MyAttr]] void f();
+*** source
+[[MyAttr]] void f() {}
+
+** struct
+*** in
+[[MyAttr]] struct s {};
+*** header
+struct s;
+[[MyAttr]] struct s {};
+
+** enum
+*** in
+[[MyAttr]] enum e {};
+*** header
+[[MyAttr]] enum e {};
+
+** enum class
+*** in
+[[MyAttr]] enum class e {};
+*** header
+[[MyAttr]] enum class e {};

@@ -1128,6 +1128,9 @@ class Declaration(Node):
         if not self.specifier.template_params:
             record = self.specifier.record_definition
             if record:
+                if record.record_kind in ['enum', 'enum class']:
+                    for attr in self.specifier.attributes:
+                        f.write(f'[[{attr}]] ')
                 record.emit_forward_declaration(f)
 
     def emit_inline_function_definitions(self, f):
@@ -1174,9 +1177,19 @@ class Declaration(Node):
         if self.specifier.is_typedef:
             return
 
+        # If this is a record definition: 
         record = self.specifier.record_definition
         if record:
             pos = f.tell()
+
+            # Enums emit as fwd-decls so their attrs go there
+            # TODO: That's a bit of a hack; enums should probably
+            #       emit in emit_interface like everything else
+            #       and just be sorted first
+            if record.record_kind not in ['enum', 'enum class']:
+                for attr in self.specifier.attributes:
+                    f.write(f'[[{attr}]] ')
+
             record.emit_interface(f)
             f.write(', '.join(d.text for d in self.declarators))
             if f.tell() != pos:
@@ -1199,7 +1212,13 @@ class Declaration(Node):
             raise Exception(self.line_directive)
 
         self.emit_line_directive(f)
-        f.write('extern %s' % self.specifier.text)
+
+        # Don't double "extern" if extern "C"
+        if self.specifier.is_extern_c:
+            f.write(self.specifier.text)
+        else:
+            f.write('extern %s' % self.specifier.text)
+
         for i, decl in enumerate(self.declarators):
             if i != 0:
                 f.write(', ')
