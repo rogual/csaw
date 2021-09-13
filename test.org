@@ -338,17 +338,23 @@ class D: C {};
 class E: public C {};
 class F: protected C {};
 class G: private C {};
+class H: public D, protected E, private F {};
+class I: public virtual C {};
 *** header
 class C;
 class D;
 class E;
 class F;
 class G;
+class H;
+class I;
 class C {};
 class D: C {};
 class E: public C {};
 class F: protected C {};
 class G: private C {};
+class H: public D, protected E, private F {};
+class I: public virtual C {};
 
 * enum class
 ** simple

@@ -422,12 +422,17 @@ class BaseRecord(Node):
         self.access = None
         self.name = None
         self.template_params = None
+        self.is_virtual = False
 
         while cursor:
             if cursor.text in ['public', 'protected', 'private']:
                 if self.access:
                     cursor.error('Too many access specifiers')
                 self.access = cursor.text
+                cursor.next()
+
+            elif cursor.text == 'virtual':
+                self.is_virtual = True
                 cursor.next()
 
             elif cursor.type == TWord:
