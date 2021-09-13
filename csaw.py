@@ -812,6 +812,10 @@ class Specifier(Node):
 
         return self
 
+    @property
+    def text_without_attributes(self):
+        return re.sub(r'\[\[.*?\]\]', '', self.text)
+
 
 class FunctionBody(Node):
     @classmethod
@@ -1221,7 +1225,8 @@ class Declaration(Node):
         if self.specifier.is_extern_c:
             f.write(self.specifier.text)
         else:
-            f.write('extern %s' % self.specifier.text)
+            f.write(''.join(f'[[{x}]] ' for x in self.specifier.attributes))
+            f.write('extern %s' % self.specifier.text_without_attributes)
 
         for i, decl in enumerate(self.declarators):
             if i != 0:

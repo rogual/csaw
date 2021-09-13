@@ -603,7 +603,7 @@ extern "C" void f() {}
 *** in
 [[MyAttr]] int x;
 *** header
-extern [[MyAttr]] int x;
+[[MyAttr]] extern int x;
 *** source
 [[MyAttr]] int x;
 
