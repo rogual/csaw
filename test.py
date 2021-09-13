@@ -21,6 +21,11 @@ def normalize(s):
     s = space_re_0.sub('', s)
     s = s.replace(marker, ' ')
     s = s.strip()
+
+    # Stop the "C" in extern "C" being squashed up against
+    # the next token and making a suffixed string
+    s = s.replace('"C"', '"C" ')
+
     return s
 
 
@@ -44,15 +49,17 @@ def items():
     cat = None
     test = None
     in_ = None
+    dep = None
     header = ''
     source = ''
     last_level = None
     for level, title, block in blocks():
         if level == 1 or level == 2 and last_level >= level:
             if test:
-                yield cat, test, in_, header, source
+                yield cat, test, dep, in_, header, source
                 test = None
                 in_ = None
+                dep = None
                 header = ''
                 source = ''
 
@@ -61,7 +68,9 @@ def items():
         elif level == 2:
             test = title
         elif level == 3:
-            if title == 'in':
+            if title == 'dep':
+                dep = block
+            elif title == 'in':
                 in_ = block
             elif title == 'header':
                 header = block
@@ -69,9 +78,28 @@ def items():
                 source = block
         last_level = level
     if test:
-        yield cat, test, in_, header, source
+        yield cat, test, dep, in_, header, source
 
-for cat, test, in_, header, source in items():
+
+def check_compiles(code):
+    import subprocess
+
+    with open('/tmp/csaw.test.cc', 'wt') as f:
+        f.write(code)
+
+    subprocess.check_call(
+        ['/usr/bin/c++',
+         '/tmp/csaw.test.cc',
+         '-fsyntax-only',
+         '-fdeclspec',
+         '-std=c++14',
+         '-Wno-unknown-attributes',
+         '-Wno-pragma-once-outside-header'
+        ]
+    )
+    
+
+for cat, test, dep, in_, header, source in items():
     #print (cat, test, in_, header, source)
 
     inputs = [
@@ -81,16 +109,16 @@ for cat, test, in_, header, source in items():
     db = csaw.Database(False, False)
     db.parse(inputs, None)
 
-    output_source = io.StringIO()
-    output_header = io.StringIO()
+    raw_output_source_file = io.StringIO()
+    raw_output_header_file = io.StringIO()
 
-    db.emit_all(output_source, output_header, None, [])
+    db.emit_all(raw_output_source_file, raw_output_header_file, None, [])
 
-    output_header = output_header.getvalue()
-    output_source = output_source.getvalue()
+    raw_output_header = raw_output_header_file.getvalue()
+    raw_output_source = raw_output_source_file.getvalue()
 
-    output_source = normalize(output_source)
-    output_header = normalize(output_header)
+    output_source = normalize(raw_output_source)
+    output_header = normalize(raw_output_header)
 
     source = normalize(source)
     header = normalize(header)
@@ -129,4 +157,9 @@ for cat, test, in_, header, source in items():
                 print('----')
                 print('Got     :', output_header)
                 ok = False
+
+        try:
+            check_compiles((dep or '') + '\n' + raw_output_header + '\n' + raw_output_source)
+        except Exception as e:
+            print(e)
     

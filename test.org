@@ -116,26 +116,30 @@ enum MyEnum { a, b, c=3, d };
 
 * function
 ** simple
+*** dep
+void stuff();
 *** in
 int fn(int a, char *b[]) {
-  anything() !! notEvenReallyParsed(); <qqq>
+  if (a || b[1]) {
+    stuff();
   }
+  return b[2][0];
+}
 *** header
 int fn(int a, char *b[]);
 *** source
 int fn(int a, char *b[]) {
-    anything() !! notEvenReallyParsed(); <qqq>
+    if (a || b[1]) { stuff(); }
+    return b[2][0];
 }
 
 ** default arguments
 *** in
-int fn(int a=1) {
-}
+int fn(int a=1) { return a; }
 *** header
 int fn(int a=1);
 *** source
-int fn(int a) {
-}
+int fn(int a) { return a; }
 
 
 * namespace
@@ -375,6 +379,8 @@ typedef S<int> Sint;
 
 * lambda in ()-assignment
 ** basic
+*** dep
+struct Thing { template<class T, class U> Thing(T t, U u) {} };
 *** in
 Thing myThing("hi", []() {});
 *** header
@@ -382,6 +388,9 @@ extern Thing myThing;
 *** source
 Thing myThing("hi", []() {});
 ** heavy
+*** dep
+struct Thing { template<class T, class U> Thing(T t, U u) {} };
+void blah(const char *);
 *** in
 Thing myThing("hi", []() {
    blah("poo");
@@ -393,6 +402,9 @@ Thing myThing("hi", []() {
     blah("poo");
 });
 ** confusing
+*** dep
+struct Thing { template<class T, class U> Thing(T t, U u) {} };
+void blah(const char *);
 *** in
 Thing myThing("hi", []() {
     blah("))))");
@@ -409,7 +421,7 @@ Thing myThing("hi", []() {
 ** assignment
 *** in
 struct S {
-S &operator=(const S &) {}
+S &operator=(const S &) { return *this; }
 };
 *** header
 struct S;
@@ -417,7 +429,7 @@ struct S {
 S &operator=(const S &);
 };
 *** source
-S &S::operator=(const S &) {}
+S &S::operator=(const S &) { return *this; }
 
 ** conversion
 *** in
@@ -467,15 +479,15 @@ int operator*(int i, S &s) { return 4; }
 ** call
 *** in
 struct S {
-S &operator()(const S &) {}
+void operator()(const S &) {}
 };
 *** header
 struct S;
 struct S {
-S &operator()(const S &);
+void operator()(const S &);
 };
 *** source
-S &S::operator()(const S &) {}
+void S::operator()(const S &) {}
 
 * typedef dependencies
 ** param
