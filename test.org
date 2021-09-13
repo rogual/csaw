@@ -599,7 +599,7 @@ extern "C" void f();
 extern "C" void f() {}
 
 * attribute
-** variable
+** TODO variable
 *** in
 [[MyAttr]] int x;
 *** header
@@ -617,18 +617,18 @@ extern "C" void f() {}
 
 ** struct
 *** in
-[[MyAttr]] struct s {};
+struct [[MyAttr]] s {};
 *** header
 struct s;
-[[MyAttr]] struct s {};
+struct [[MyAttr]] s {};
 
-** enum
+** TODO enum
 *** in
 [[MyAttr]] enum e {};
 *** header
 [[MyAttr]] enum e {};
 
-** enum class
+** TODO enum class
 *** in
 [[MyAttr]] enum class e {};
 *** header

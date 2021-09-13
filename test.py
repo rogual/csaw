@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import csaw
+import sys
 import io
 import re
 
@@ -97,10 +98,17 @@ def check_compiles(code):
          '-Wno-pragma-once-outside-header'
         ]
     )
+
+
+query = ''
+if len(sys.argv) > 1:
+    query = sys.argv[1]
     
 
 for cat, test, dep, in_, header, source in items():
-    #print (cat, test, in_, header, source)
+
+    if query not in cat and query not in test:
+        continue
 
     inputs = [
         io.StringIO(in_)

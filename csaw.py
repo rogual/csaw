@@ -538,6 +538,7 @@ class RecordDefinition(Node):
         self.name = None
         self.bases = None
         self.children = []
+        self.attributes = []
         self.is_q_object = False
 
         self.head = TokenRange(cursor)
@@ -583,6 +584,18 @@ class RecordDefinition(Node):
 
             elif cursor.text == '{':
                 break
+
+            elif cursor.text == '[[':
+                cursor.next()
+                attr = cursor.text
+                self.attributes.append(attr)
+                cursor.next()
+                if cursor.text != ']]':
+                    cursor.error('Expected "]]" after "%s" to close attribute specifier' % attr)
+                cursor.next()
+
+            else:
+                cursor.error(f'Unexpected "{cursor.text}"')
 
 
         # Parse body
@@ -636,14 +649,20 @@ class RecordDefinition(Node):
     def emit_forward_declaration(self, f):
         if self.record_kind in ['enum', 'enum class']:
             self.emit_line_directive(f)
+
+            for attr in self.attributes:
+                f.write(f'[[f:{attr}]] ')
             f.write(self.text)
             f.write(';\n')
         else:
             f.write('%s %s;\n' % (self.record_kind, self.name))
 
     def emit_interface(self, f):
+
+
         if self.record_kind in ['enum', 'enum class'] and local.RecordScope:
             self.head.emit_line_directive(f)
+
             f.write(self.text)
             f.write('\n')
 
@@ -651,7 +670,8 @@ class RecordDefinition(Node):
             pass
         else:
             self.head.emit_line_directive(f)
-            f.write(self.head.text)
+
+            f.write(self.head.text.replace(self.record_kind, self.record_kind))
             f.write('\n')
 
             if self.is_q_object:
@@ -1136,9 +1156,6 @@ class Declaration(Node):
         if not self.specifier.template_params:
             record = self.specifier.record_definition
             if record:
-                if record.record_kind in ['enum', 'enum class']:
-                    for attr in self.specifier.attributes:
-                        f.write(f'[[{attr}]] ')
                 record.emit_forward_declaration(f)
 
     def emit_inline_function_definitions(self, f):
@@ -1190,14 +1207,6 @@ class Declaration(Node):
         if record:
             pos = f.tell()
 
-            # Enums emit as fwd-decls so their attrs go there
-            # TODO: That's a bit of a hack; enums should probably
-            #       emit in emit_interface like everything else
-            #       and just be sorted first
-            if record.record_kind not in ['enum', 'enum class']:
-                for attr in self.specifier.attributes:
-                    f.write(f'[[{attr}]] ')
-
             record.emit_interface(f)
             f.write(', '.join(d.text for d in self.declarators))
             if f.tell() != pos:
@@ -1225,7 +1234,6 @@ class Declaration(Node):
         if self.specifier.is_extern_c:
             f.write(self.specifier.text)
         else:
-            f.write(''.join(f'[[{x}]] ' for x in self.specifier.attributes))
             f.write('extern %s' % self.specifier.text_without_attributes)
 
         for i, decl in enumerate(self.declarators):
