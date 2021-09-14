@@ -1267,7 +1267,9 @@ class Declaration(Node):
             f.write(spec + ' ')
 
         declarator_texts = []
-        for d in self.declarators:
+        for i, d in enumerate(self.declarators):
+            if i != 0:
+                f.write(', ')
             for token in d.range.tokens:
                 if token.text == '=':
                     break

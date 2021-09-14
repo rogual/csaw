@@ -234,6 +234,56 @@ struct q { void f(); };
 *** source
 void q::f() {}
 
+* static member var
+** single with init
+*** in
+struct S {
+   static int a = 1;
+};
+*** header
+struct S;
+struct S {
+   static int a;
+};
+*** source
+int S::a = 1;
+** multi with init
+*** in
+struct S {
+   static int a=1, b=2;
+};
+*** header
+struct S;
+struct S {
+   static int a, b;
+};
+*** source
+int S::a = 1, S::b = 2;
+* static const member var
+** single with init
+*** in
+struct S {
+   static const int a = 1;
+};
+*** header
+struct S;
+struct S {
+   static const int a;
+};
+*** source
+const int S::a = 1;
+** multi with init
+*** in
+struct S {
+   static const int a=1, b=2;
+};
+*** header
+struct S;
+struct S {
+   static const int a, b;
+};
+*** source
+const int S::a = 1, S::b = 2;
 * virtual function
 ** simple
 *** in
