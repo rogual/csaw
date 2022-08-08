@@ -748,3 +748,17 @@ extern int e;
 int a = 1;
 int c = 3;
 int e = 5;
+
+
+* #pragma
+** depends
+*** in
+#pragma depends Thing
+*** header
+*** source
+
+* empty file
+** simple
+*** in
+*** header
+*** source

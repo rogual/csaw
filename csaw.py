@@ -1746,16 +1746,16 @@ class Database:
 
 
         cursor = Cursor(tokens, 0)
+
+        while cursor and cursor.text == '#pragma':
+            cursor.next()
+            if cursor.text != 'depends':
+                cursor.error("Unrecognized #pragma: '%s'" % cursor.text)
+            cursor.next()
+            manual_deps.append(cursor.text)
+            cursor.next()
+
         while cursor:
-
-            while cursor.text == '#pragma':
-                cursor.next()
-                if cursor.text != 'depends':
-                    cursor.error("Unrecognized #pragma: '%s'" % cursor.text)
-                cursor.next()
-                manual_deps.append(cursor.text)
-                cursor.next()
-
             decl = parse_declaration(cursor)
             decl.manual_deps = manual_deps
             decls.append(decl)
