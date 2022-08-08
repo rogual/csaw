@@ -153,20 +153,26 @@ class Token:
 
 class Lexer:
     regexes = [
-        (None, re.compile(r'\s+')),
-        (None, re.compile(r'//.*?(\n|$)')),
-        (None, re.compile(r'/\*.*?\*/', re.DOTALL)),
-        (TString, re.compile(r'"([^"\\]|\\.)*"')),
-        (TString, re.compile(r"'([^'\\]|\\.)*'")),
-        (TDirective, re.compile(r"#[a-z]+")),
+        (None, re.compile('|'.join([
+            r'\s+',
+            r'//.*?(\n|$)',
+            r'/\*(.|\n)*?\*/'
+        ]))),
         (TWord, re.compile(r'@?[A-Za-z_][A-Za-z_0-9]*')),
+        (TString, re.compile('|'.join([
+            r'"([^"\\]|\\.)*"',
+            r"'([^'\\]|\\.)*'"
+        ]))),
+        (TPunctuation, re.compile('|'.join([
+            r'<<',
+            r'\[\[',
+            r'\]\]',
+            r'::',
+            r'->',
+            '[' + re.escape('!%&()*+,-./:;<=>?[]^{|}~') + ']'
+        ]))),
         (TNumber, re.compile(r'[0-9][0-9A-Fa-f.]*')),
-        (TPunctuation, re.compile(r'<<')),
-        (TPunctuation, re.compile(r'\[\[')),
-        (TPunctuation, re.compile(r'\]\]')),
-        (TPunctuation, re.compile(r'::')),
-        (TPunctuation, re.compile(r'->')),
-        (TPunctuation, re.compile('[' + re.escape(string.punctuation) + ']')),
+        (TDirective, re.compile(r"#[a-z]+")),
     ]
 
     line_directive_regex = re.compile('(\d+) "(.*)"')
@@ -205,6 +211,7 @@ class Lexer:
                     length = span[1] - span[0]
                     assert length > 0
                     token = None
+
                     if type_ is not None:
                         token = Token(self, type_, pos, length)
 

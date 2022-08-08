@@ -13,6 +13,7 @@ spec = open('test.org', 'rt')
 space_re_1 = re.compile(r'(?<=[A-Za-z0-9_])\s+(?=[A-Za-z0-9_])')
 space_re_0 = re.compile(r'\s+')
 strip_re = re.compile('^#pragma once$|#line.*$', re.MULTILINE)
+header_re = re.compile(r'\*+ ')
 
 
 def normalize(s):
@@ -35,7 +36,7 @@ def blocks():
     block = ''
     title = ''
     for line in spec:
-        if line.startswith('*'):
+        if header_re.match(line):
             yield level, title, block
             title = line.lstrip('*')
             level = len(line) - len(title)
@@ -114,7 +115,10 @@ for cat, test, dep, in_, header, source in items():
         io.StringIO(in_)
     ]
 
-    db = csaw.Database(False, False)
+    debug_lexer = False
+    debug_syntax = False
+    
+    db = csaw.Database(debug_lexer, debug_syntax)
     db.parse(inputs, None)
 
     raw_output_source_file = io.StringIO()

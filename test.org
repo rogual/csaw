@@ -689,3 +689,42 @@ struct [[MyAttr]] s {};
 [[MyAttr]] enum class e {};
 *** header
 [[MyAttr]] enum class e {};
+
+
+* comments
+** single-line
+*** in
+int a = 1;
+// int b = 2;
+int c = 3; // int d1 = 4;
+// int d2 = 4;
+int e = 5;
+*** header
+extern int a;
+extern int c;
+extern int e;
+*** source
+int a = 1;
+int c = 3;
+int e = 5;
+
+** multi-line
+*** in
+int a = 1;
+/* int b1 = 2;
+int b2 = 2; */
+int c = 3;
+/*
+int d0 = 4;
+int d1 = 4;
+int d2 = 4;
+*/
+int e = 5;
+*** header
+extern int a;
+extern int c;
+extern int e;
+*** source
+int a = 1;
+int c = 3;
+int e = 5;
