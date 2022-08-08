@@ -185,16 +185,16 @@ class Lexer:
             r'"([^"\\]|\\.)*"',
             r"'([^'\\]|\\.)*'"
         ]))),
+        (TDirective, re.compile(r"^#[A-Za-z0-9_]+", re.MULTILINE)),
         (TPunctuation, re.compile('|'.join([
             r'<<',
             r'\[\[',
             r'\]\]',
             r'::',
             r'->',
-            '[' + re.escape('!%&()*+,-./:;<=>?[]^{|}~') + ']'
+            '[' + re.escape(string.punctuation) + ']'
         ]))),
         (TNumber, re.compile(r'[0-9][0-9A-Fa-f.]*')),
-        (TDirective, re.compile(r"#[a-z]+")),
     ]
 
     line_directive_regex = re.compile('(\d+) "(.*)"')

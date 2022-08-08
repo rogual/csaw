@@ -750,12 +750,36 @@ int c = 3;
 int e = 5;
 
 
-* #pragma
-** depends
+* directives
+** #pragma depends
 *** in
 #pragma depends Thing
 *** header
 *** source
+** #line
+*** in
+int a = 1;
+#line 50 "ZAG"
+int b = 2;
+*** header
+extern int a;
+extern int b;
+*** source
+int a = 1;
+int b = 2;
+
+** #
+*** in
+int a = 1;
+# 50 "ZAG"
+int b = 2;
+*** header
+extern int a;
+extern int b;
+*** source
+int a = 1;
+int b = 2;
+
 
 * empty file
 ** simple
