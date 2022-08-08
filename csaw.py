@@ -2,7 +2,24 @@
 
 """
 
-TODO:
+CSAW by Robin Allen <r@foon.uk>
+
+
+Licence
+=======
+
+You may redistribute csaw as long as the original author remains
+acknowledged as above, and this licence text is included
+unmodified.
+
+If you use csaw to build your software, an acknowledgement in
+the product documentation would be appreciated but is not
+required.
+
+
+TODO
+====
+
   namespace
     Splitting a namespace over several files isn't supported
     yet. Shouldn't be too hard, I just never use it.
@@ -18,7 +35,8 @@ TODO:
 
   C++11 {}-initialization e.g. int a{4};
 
-Areas where csaw needs some help:
+Areas where csaw needs some help
+================================
 
   Nested classes
     Use #pragma depends Parent if you use Parent::x
@@ -35,11 +53,15 @@ Areas where csaw needs some help:
         #pragma depends<T> vector<T> T
 
 Preprocessor
+============
+
    Not supported. Preprocess your files before csaw sees them. One
    custom directive is supported, #pragma depends, which marks all items
    in a file as depending on a specific name.
 
 Qt
+==
+
     Pass -qt and Q_OBJECT will be recognized. This makes the emitted
     source file suitable for processing with moc.
 """
