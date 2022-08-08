@@ -103,8 +103,9 @@ def check_compiles(code):
 
 
 query = ''
-if len(sys.argv) > 1:
-    query = sys.argv[1]
+words = [x for x in sys.argv[1:] if not x.startswith('-')]
+if words:
+    query = words[0]
     
 
 for cat, test, dep, in_, header, source in items():
@@ -116,8 +117,8 @@ for cat, test, dep, in_, header, source in items():
         io.StringIO(in_)
     ]
 
-    debug_lexer = False
-    debug_syntax = False
+    debug_lexer = '-dl' in sys.argv
+    debug_syntax = '-ds' in sys.argv
     
     db = csaw.Database(debug_lexer, debug_syntax)
     db.parse(inputs, None)
