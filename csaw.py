@@ -259,7 +259,7 @@ class Lexer:
                                 mapped_line_offset = mapped_line - token.real_line - 1
 
                             else:
-                                fatal("Wonky line directive in '%s'" % input_path)
+                                fatal("Wonky line directive at index %i of '%s'" % (pos, input_path))
 
                             pos = line_end
 
