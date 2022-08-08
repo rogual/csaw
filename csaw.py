@@ -808,6 +808,9 @@ class Specifier(Node):
                 else:
                     cursor.error('Repeated "constexpr"')
 
+            elif cursor.text == '__stdcall':
+                cursor.next()
+
             elif cursor.text == 'extern':
                 cursor.next()
                 if cursor.text != '"C"':

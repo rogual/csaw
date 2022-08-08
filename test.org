@@ -606,6 +606,26 @@ struct S {
 int S::getX() { return 42; }
 void S::setX(int x) {}
 
+* __stdcall
+** basic
+*** in
+int __stdcall WindowProc() { return 0; }
+*** header
+int __stdcall WindowProc();
+*** source
+int __stdcall WindowProc() { return 0; }
+** member function
+*** in
+struct S {
+    static int __stdcall WindowProc() { return 0; }
+};
+*** header
+struct S;
+struct S {
+    static int __stdcall WindowProc();
+};
+*** source
+int __stdcall S::WindowProc() { return 0; }
 * constexpr variable
 ** simple
 *** in

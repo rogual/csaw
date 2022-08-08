@@ -96,7 +96,8 @@ def check_compiles(code):
          '-fdeclspec',
          '-std=c++14',
          '-Wno-unknown-attributes',
-         '-Wno-pragma-once-outside-header'
+         '-Wno-pragma-once-outside-header',
+         '-Wno-ignored-attributes',
         ]
     )
 
