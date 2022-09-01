@@ -44,6 +44,14 @@ int a[64];
 *** header
 extern int a[64];
 
+** array with automatic length
+*** in
+int a[] = {1, 2, 3};
+*** source
+int a[] = {1, 2, 3};
+*** header
+extern int a[3];
+
 * typedef
 ** simple
 *** in
@@ -233,6 +241,30 @@ struct q;
 struct q { void f(); };
 *** source
 void q::f() {}
+** const
+*** in
+struct q { void f() const {}};
+*** header
+struct q;
+struct q { void f() const; };
+*** source
+void q::f() const {}
+** rvalue this
+*** in
+struct q { void f() && {}};
+*** header
+struct q;
+struct q { void f() &&; };
+*** source
+void q::f() && {}
+** const rvalue this
+*** in
+struct q { void f() const && {}};
+*** header
+struct q;
+struct q { void f() const &&; };
+*** source
+void q::f() const && {}
 
 * static member var
 ** single with init

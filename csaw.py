@@ -1027,9 +1027,17 @@ class Declarator(Node):
 
     @property
     def extern_text(self):
+        # The extern text for a declarator is the declarator without any initializer
+        # and with any unnecessary brackets removed. For arrays with no explicit
+        # length, we also count the elements in the initializer and add an explicit
+        # length to the extern declaration so code seeing only the declaration can
+        # make use of the array length information.
         text = ''
 
-        # Remove balanced brackets
+        in_init = False
+        init_array_count = None
+        
+        # Remove balanced brackets, and count array initializer
         level = 0
         for token in self.range.tokens:
             if (token.text == '(' or (level > 0 and token.text in '{[')): level += 1
@@ -1037,9 +1045,23 @@ class Declarator(Node):
             elif level == 0:
                 text += token.text + ' '
 
-        # Remove =-assignment
+            if level == 0 and init_array_count is None and token.text == '=':
+                in_init = True
+
+            if level == 0 and init_array_count is None and in_init and token.text == '{':
+                init_array_count = 1
+
+            if level == 0 and in_init and token.text == ',':
+                init_array_count += 1
+
+        # Remove =-assignment and add array count
         if 'operator' not in text:
-            text = re.sub('=.*', '', text, flags=re.DOTALL)
+            if '=' in text:
+                text, initializer = text.split('=', maxsplit=1)
+                text = text.rstrip()
+                initializer = initializer.lstrip()
+                if text.endswith('[ ]') and init_array_count is not None:
+                    text = text[:-3] + f'[{init_array_count}]'
 
         return text
 
