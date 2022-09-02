@@ -128,7 +128,6 @@ class Token:
         self.type = type_
         self.index = index
         self.length = length
-        self.tokens = []
 
         self.mapped_line_offset = 0
         self.mapped_path = None
@@ -199,6 +198,17 @@ class Lexer:
 
     line_directive_regex = re.compile('(\d+) "(.*)"')
 
+    @functools.cached_property
+    def line_map(self):
+        source_length = len(self.source_text)
+        line_map = array.array('L', [0]) * source_length
+        line = 1
+        for i, char in enumerate(self.source_text):
+            if char == '\n':
+                line += 1
+            line_map[i] = line
+        return line_map
+
     def __init__(self, input_path):
         if isinstance(input_path, str):
             self.input_path = input_path
@@ -209,14 +219,6 @@ class Lexer:
             self.source_text = input_path.read()
 
         source_length = len(self.source_text)
-
-        # Build the line map
-        self.line_map = array.array('L', [0]) * source_length
-        line = 1
-        for i, char in enumerate(self.source_text):
-            if char == '\n':
-                line += 1
-            self.line_map[i] = line
 
         self.tokens = []
 
@@ -1039,7 +1041,15 @@ class Declarator(Node):
         
         # Remove balanced brackets, and count array initializer
         level = 0
+        xlevel = 0
         for token in self.range.tokens:
+
+            if token.text in '{[(':
+                xlevel+=1
+
+            if token.text in ')]}':
+                xlevel-=1
+
             if (token.text == '(' or (level > 0 and token.text in '{[')): level += 1
             elif level != 0 and token.text in ']})': level -= 1
             elif level == 0:
@@ -1048,10 +1058,12 @@ class Declarator(Node):
             if level == 0 and init_array_count is None and token.text == '=':
                 in_init = True
 
-            if level == 0 and init_array_count is None and in_init and token.text == '{':
-                init_array_count = 1
+            if xlevel == 0 and init_array_count is None and in_init and token.text == '{':
+                init_array_count = 0
 
-            if level == 0 and in_init and token.text == ',':
+            if xlevel == 1 and in_init and token.text == ',':
+                if init_array_count is None:
+                    init_array_count = 1
                 init_array_count += 1
 
         # Remove =-assignment and add array count

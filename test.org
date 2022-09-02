@@ -51,6 +51,16 @@ int a[] = {1, 2, 3};
 int a[] = {1, 2, 3};
 *** header
 extern int a[3];
+** array with automatic length (complex)
+*** in
+struct X {int a, b; };
+X a[] = {{1, 2}, {3, 4}, {5, 6}};
+*** source
+X a[] = {{1, 2}, {3, 4}, {5, 6}};
+*** header
+struct X;
+struct X {int a, b; };
+extern X a[3];
 
 * typedef
 ** simple
