@@ -1042,10 +1042,13 @@ class Declarator(Node):
         # Remove balanced brackets, and count array initializer
         level = 0
         xlevel = 0
+        ready = False
         for token in self.range.tokens:
 
             if token.text in '{[(':
                 xlevel+=1
+                if xlevel == 1:
+                    ready = True
 
             if token.text in ')]}':
                 xlevel-=1
@@ -1061,10 +1064,15 @@ class Declarator(Node):
             if xlevel == 0 and init_array_count is None and in_init and token.text == '{':
                 init_array_count = 0
 
-            if xlevel == 1 and in_init and token.text == ',':
-                if init_array_count is None:
-                    init_array_count = 1
-                init_array_count += 1
+            if xlevel == 1 and in_init:
+                if token.text == ',':
+                    ready = True
+
+                elif ready:
+                    ready = False
+                    if init_array_count is None:
+                        init_array_count = 0
+                    init_array_count += 1
 
         # Remove =-assignment and add array count
         if 'operator' not in text:
