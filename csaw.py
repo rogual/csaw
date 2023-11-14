@@ -207,12 +207,14 @@ class Lexer:
             if char == '\n':
                 line += 1
             line_map[i] = line
+
+        self._line_map = line_map
         return line_map
 
     def __init__(self, input_path):
         if isinstance(input_path, str):
             self.input_path = input_path
-            with open(input_path, 'rt') as f:
+            with open(input_path, 'rt', encoding='utf-8') as f:
                 self.source_text = f.read()
         else:
             self.input_path = '<memory>'
@@ -1751,7 +1753,7 @@ class Database:
     def emit_interfaces(self, f):
 
         for include in self.includes:
-            with open(include, 'rt') as i:
+            with open(include, 'rt', encoding='utf-8') as i:
                 f.write(i.read())
                 f.write('\n')
             
