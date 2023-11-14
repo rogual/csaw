@@ -1825,26 +1825,44 @@ class Database:
                 
         
 
-    def emit_all(self, source_path, header_path, depinfo_path, includes):
+    def emit_all(self, source_path, header_path, depinfo_path, includes, wrap_ns=None):
         self.includes = includes
         self.depinfo_path = depinfo_path
 
         # Figure out interface dependencies
         self.sort_decls()
 
+        if wrap_ns is None:
+            wrap_ns = []
+        elif isinstance(wrap_ns, str):
+            wrap_ns = wrap_ns.split('::')
+
         # Parse all declarations
         # Emit output
         if header_path:
             with to_file(header_path, 'wt') as f:
                 f.write('#pragma once\n\n')
+
+                for ns in wrap_ns:
+                    f.write(f'namespace {ns} {{\n')
+
                 self.emit_interfaces(f)
+
+                for ns in wrap_ns:
+                    f.write(f'}}\n')
 
         if source_path:
             with to_file(source_path, 'wt') as f:
+                for ns in wrap_ns:
+                    f.write(f'namespace {ns} {{\n')
+
                 if not header_path:
                     self.emit_interfaces(f)
                     f.write('\n// -- IMPLEMENTATIONS --\n\n')
                 self.emit_implementations(f)
+
+                for ns in wrap_ns:
+                    f.write(f'}}\n')
 
     def sort_decls(self):
         decls = self.decls
@@ -1932,19 +1950,25 @@ def unindent(text):
 
 def get_argument_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-oc', metavar='PATH', help='Output source file')
-    parser.add_argument('-oh', metavar='PATH', help='Output header file')
-    parser.add_argument('-od', metavar='PATH', help='Output dependency information')
-    parser.add_argument('-on', metavar='PATH', help='Output names declared in each file')
-    parser.add_argument('-i', metavar='PATH', help='Includes to add to generated source', nargs='*')
-    parser.add_argument('-nl', action='store_true', help='Omit #line directives')
-    parser.add_argument('-qt', action='store_true', help='Enable Qt extensions')
+
     parser.add_argument('inputs', nargs='+', help='Input files')
+
+    g = parser.add_argument_group('output paths')
+    g.add_argument('-oc', metavar='PATH', help='Output source file')
+    g.add_argument('-oh', metavar='PATH', help='Output header file')
+    g.add_argument('-od', metavar='PATH', help='Output dependency information')
+    g.add_argument('-on', metavar='PATH', help='Output names declared in each file')
+
+    g = parser.add_argument_group('code generation')
+    g.add_argument('-i', metavar='PATH', help='Includes to add to generated source', nargs='*')
+    g.add_argument('-nl', action='store_true', help='Omit #line directives')
+    g.add_argument('-ns', metavar='NAMESPACE', help='Wrap everything in a namespace')
+    g.add_argument('-qt', action='store_true', help='Enable Qt extensions')
     
-    debug = parser.add_argument_group('arguments used for debugging')
-    debug.add_argument('-dt', action='store_true', help='Trace tokenization to stderr')
-    debug.add_argument('-ds', action='store_true', help='Trace syntax tree to stderr')
-    debug.add_argument('-dx', action='store_true', help='Print tracebacks on parse errors')
+    g = parser.add_argument_group('arguments used for debugging')
+    g.add_argument('-dt', action='store_true', help='Trace tokenization to stderr')
+    g.add_argument('-ds', action='store_true', help='Trace syntax tree to stderr')
+    g.add_argument('-dx', action='store_true', help='Print tracebacks on parse errors')
 
     return parser
 
@@ -1981,7 +2005,7 @@ def main():
         parser.error('at least one of -oc and -oh must be specified.')
 
     db = parse_to_db(args)
-    db.emit_all(args.oc, args.oh, args.od, args.i or [])
+    db.emit_all(args.oc, args.oh, args.od, args.i or [], args.ns)
     return db
 
 if __name__ == '__main__':
