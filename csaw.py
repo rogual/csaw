@@ -1924,10 +1924,22 @@ class Database:
                 msg = 'Cycle in dependencies:\n'
                 for decl in decls:
                     for dep in deps_by_decl[decl]:
-                        msg += '%s -> %s\n' % (
-                            ', '.join(dep.defined_names),
-                            ', '.join(decl.defined_names)
-                        )
+                        if dep not in done:
+                            msg += '%s -> %s\n' % (
+                                ', '.join(decl.defined_names),
+                                ', '.join(dep.defined_names)
+                            )
+
+                with open('csaw-cycle.dot', 'wt') as f:
+                    f.write('digraph D {\n')
+                    for decl in decls:
+                        for dep in deps_by_decl[decl]:
+                            if dep not in done:
+                                for to in dep.defined_names:
+                                    for from_ in decl.defined_names:
+                                        f.write(f'  {from_} -> {to}\n')
+                    f.write('}\n')
+
                 raise Exception(msg)
 
         self.decls = sorted_decls
