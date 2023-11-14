@@ -763,6 +763,35 @@ struct [[MyAttr]] s {};
 *** header
 [[MyAttr]] enum class e {};
 
+* bitfield
+** basic
+*** in
+struct S {
+   int a;
+   int b:1, c:2;
+   int d;
+   int e:3;
+};
+*** header
+struct S;
+struct S {
+   int a;
+   int b:1, c:2;
+   int d;
+   int e:3;
+};
+
+** TODO silly
+*** in
+struct S {
+    int (a): 1;
+};
+*** header
+struct S;
+struct S {
+    int (a): 1;
+};
+
 
 * comments
 ** single-line

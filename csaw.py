@@ -936,6 +936,9 @@ class Declarator(Node):
     @classmethod
     def _parse(cls, cursor):
         self = Declarator()
+        self.bitfield_width = None
+
+        can_be_bitfield = True
 
         level = 0
         while cursor:
@@ -946,9 +949,18 @@ class Declarator(Node):
                     cursor.next()
                     continue
 
-            if level == 0 and cursor.text in [',', ';', '{', ':']:
+            if level == 0 and can_be_bitfield and cursor.text == ':':
+                pass
+            elif level == 0 and cursor.text in [',', ';', '{', ':']:
                 break
+
             if cursor.text in ['(', '[', '{',]:
+                # TODO: Not really true. "int (a): 4" is a valid, if silly,
+                # bitfield declaration. Probably the part after the colon
+                # should just be parsed as part of the declarator in all
+                # cases, whether it's an initializer list or a bitfield width,
+                # and Declaration can sort out which one it is.
+                can_be_bitfield = False
                 level += 1
             elif cursor.text in [')', ']', '}',]:
                 level -= 1
