@@ -109,7 +109,7 @@ def fatal(msg):
 @contextlib.contextmanager
 def to_file(path_or_file, mode):
     if isinstance(path_or_file, str):
-        with open(path_or_file, mode) as f:
+        with open(path_or_file, mode, encoding='utf-8') as f:
             yield f
     else:
         yield path_or_file
