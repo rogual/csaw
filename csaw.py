@@ -578,6 +578,8 @@ class RecordDefinition(Node):
         self.children = []
         self.attributes = []
         self.is_q_object = False
+        self.manual_deps = set()
+        self.manual_non_deps = set()
 
         self.head = TokenRange(cursor)
 
@@ -681,6 +683,9 @@ class RecordDefinition(Node):
 
         for child in self.children:
             deps = deps | child.get_dependencies(names, typedef_names)
+
+        deps |= self.manual_deps
+        deps -= self.manual_non_deps
 
         return deps
 
@@ -1108,6 +1113,7 @@ class NamespaceDeclaration(Node):
         self = NamespaceDeclaration()
         self.children = []
         self.manual_deps = []
+        self.manual_non_deps = []
 
         assert cursor.text == 'namespace'
 
@@ -1183,6 +1189,7 @@ class NamespaceDeclaration(Node):
         for child in self.children:
             deps = deps | child.get_dependencies(names, typedef_names)
         deps |= set(self.manual_deps)
+        deps -= set(self.manual_non_deps)
         return deps
 
 
@@ -1196,6 +1203,7 @@ class Declaration(Node):
         self.function_body = None
         self.declarators = []
         self.manual_deps = []
+        self.manual_non_deps = []
 
         self.specifier = Specifier.parse(cursor)
 
@@ -1524,8 +1532,8 @@ class Declaration(Node):
             if used_typedefs:
                 r |= used_typedefs
             
-
         r |= set(self.manual_deps)
+        r -= set(self.manual_non_deps)
 
         return r
 
@@ -1791,6 +1799,7 @@ class Database:
         tokens = Lexer(path)
 
         manual_deps = []
+        manual_non_deps = []
         decls = []
 
         if self.debug_lexer:
@@ -1805,15 +1814,20 @@ class Database:
 
         while cursor and cursor.text == '#pragma':
             cursor.next()
-            if cursor.text != 'depends':
+            if cursor.text == 'depends':
+                cursor.next()
+                if cursor.text.startswith('-'):
+                    manual_non_deps.append(cursor.text[1:])
+                else:
+                    manual_deps.append(cursor.text)
+            else:
                 cursor.error("Unrecognized #pragma: '%s'" % cursor.text)
-            cursor.next()
-            manual_deps.append(cursor.text)
             cursor.next()
 
         while cursor:
             decl = parse_declaration(cursor)
             decl.manual_deps = manual_deps
+            decl.manual_non_deps = manual_non_deps
             decls.append(decl)
 
             if self.debug_syntax:
