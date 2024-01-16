@@ -688,7 +688,6 @@ class RecordDefinition(Node):
 
     def emit_interface(self, f):
 
-
         if self.record_kind in ['enum', 'enum class'] and local.RecordScope:
             self.head.emit_line_directive(f)
 
@@ -1023,7 +1022,6 @@ class Declarator(Node):
 
         start_i = name_i
 
-        
     @property
     def requires_full_declaration(self):
         for item in self.reading:
@@ -1425,7 +1423,7 @@ class Declaration(Node):
 
         if self.specifier.is_constexpr and not local.RecordScope:
             return
-        
+
         if self.function_body:
             if not self.is_inline_or_template_function:
                 self.emit_function_definition(f)
