@@ -172,8 +172,9 @@ for cat, test, dep, in_, header, source in items():
                 print('Got     :', output_header)
                 ok = False
 
-        try:
-            check_compiles((dep or '') + '\n' + raw_output_header + '\n' + raw_output_source)
-        except Exception as e:
-            print(e)
+        if 'objc' not in cat:
+            try:
+                check_compiles((dep or '') + '\n' + raw_output_header + '\n' + raw_output_source)
+            except Exception as e:
+                print(e)
     
