@@ -1278,6 +1278,7 @@ class Declaration(Node):
             self.emit_static_member_vars_interface(f)
             return
 
+        # If this is a template struct or class
         if self.specifier.record_definition and self.specifier.template_params:
             self.emit_line_directive(f)
             f.write(self.text)
