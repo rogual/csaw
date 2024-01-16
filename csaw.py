@@ -1255,7 +1255,7 @@ class Declaration(Node):
 
     def emit_interface(self, f):
 
-        if self.specifier.is_constexpr:
+        if self.specifier.is_constexpr and not self.function_body:
 
             # As a convenience, we allow omission of "static" on a member
             # constexpr var, because they always must be static.
