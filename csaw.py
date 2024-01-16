@@ -17,24 +17,6 @@ the product documentation would be appreciated but is not
 required.
 
 
-TODO
-====
-
-  namespace
-    Splitting a namespace over several files isn't supported
-    yet. Shouldn't be too hard, I just never use it.
-
-  template class
-    could be smarter and actually split out member fndefs
-    probably no point for now
-
-  template member function
-    definition should go in header, not source
-
-  R"" strings and other c++11 weirdo strings
-
-  C++11 {}-initialization e.g. int a{4};
-
 Areas where csaw needs some help
 ================================
 
