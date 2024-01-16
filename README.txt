@@ -6,8 +6,8 @@ csaw: life's too short to write header files
 What It Is
 ----------
 
-A preprocessor for C++. You could also consider it to be
-a compiler for an (unnamed) dialect of C++.
+A preprocessor for C++ which saves you from having to write
+header files or forward declarations.
 
 
 Why?
@@ -37,7 +37,11 @@ automatically and written to the file in dependency order.
 Optionally, you can ask for a separate .h file containing
 only the interfaces, and omitting most function bodies. This
 is useful if you're compiling a library and you want to
-distribute a normal .h file to your users.
+distribute a normal .h file to your users, or if you have
+a large program which you'd like to compile in several
+translation units. In that case, you'd call csaw once for
+each unit, compile each to its own .o file, and link them
+together as usual.
 
 
 Features
@@ -66,7 +70,10 @@ and pass the processed source to csaw.
 Limitations: General
 --------------------
 
-* The whole thing is a massive hack.
+* The whole thing is a massive hack, and is very much "works for
+me". It understands enough of C++ to be useful for my own projects,
+but I'm sure there are large gaps beyond even what is documented
+here. PRs are welcome!
 
 
 Limitation: Nested Names
@@ -106,8 +113,8 @@ class B {
 Avoid using nested names from outside their containing class.
 
 
-Limitation: Namespaces
-----------------------
+Limitation: Anonymous namespaces
+--------------------------------
 
 Anonymous namespaces are not supported.
 
@@ -157,31 +164,11 @@ class MyClass {
 Rationale: Saves you declaring the variable twice.
 
 
-Enhancement: Objective-C
-------------------------
-
-Objective-C classes may be defined in a single @interface block and
-do not require a separate @implementation block:
-
-@interface MyClass {
-  int _myVar;
-}
-
--(void)myMethod {
-  puts("hi");
-}
-@end
-
-Rationale: Saves you a bit of typing.
-
-
 Limitation: Objective-C
 -----------------------
 
-If you choose to write your Objective-C classes in the normal
-@interface + @implementation style, then each Objective-C class must
-be written as an @interface block with its @implementation immediately
-following it.
+Ech Objective-C class must be written as an @interface block with its
+@implementation immediately following it.
 
 
 Limitation: Templates
@@ -222,6 +209,7 @@ all.pch: all.h
 %.o: $.mod.cc:
      $(CC) -c -o $@ $<
 
+
 Q&A
 ---
 
@@ -233,9 +221,9 @@ of csaw is to save you from having to write correct C++. In
 particular, clang requires type information to be declared
 before names are referenced, which we don't want to require.
 
+
 See Also
 --------
 
 Lazy C++ <https://www.lazycplusplus.com> : Another project
 with a similar goal.
-
