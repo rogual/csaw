@@ -358,21 +358,6 @@ class D: C {
 *** source
 void D::f() {}
 
-* template struct
-** simple
-*** in
-    template<class T, class U>
-    struct S {
-    int q;
-    int f() { return q; }
-    };
-*** header
-    template<class T, class U>
-    struct S {
-    int q;
-    int f() { return q; }
-    };
-
 * template function
 ** simple
 *** in
@@ -386,6 +371,24 @@ template<class T, class U>
 T f(U a) {
     return a;
 }
+
+* template struct
+** simple
+*** in
+template<class T, class U>
+struct S {
+    int q;
+    int f() { return q; }
+};
+*** header
+template<class T, class U>
+struct S {
+    int q;
+    int f();
+};
+
+template<class T, class U>
+int S<T, U>::f() { return q; }
 
 * template member function
 ** simple
@@ -402,7 +405,7 @@ struct q {
     template<class T, class U>
     T f(U a);
 };
-*** source
+
 template<class T, class U>
 T q::f(U a) {
     return a;
@@ -711,6 +714,19 @@ struct S {
 *** source
 constexpr int S::x;
 
+* constexpr member function
+** simple
+*** in
+struct S {
+    constexpr int f() { return 4; }
+};
+*** header
+struct S;
+struct S {
+    constexpr int f();
+};
+constexpr int S::f() { return 4; }
+
 * extern "C"
 ** variable
 *** in
@@ -791,6 +807,33 @@ struct S;
 struct S {
     int (a): 1;
 };
+
+
+* objc class
+** basic
+*** in
+@interface MyClass {
+   int myvar;
+}
+@end
+
+@implementation MyClass
+-(int)myInstanceMethod:(int)myArg { return myArg; }
++(int)myClassMethod:(int)myArg { return myArg; }
+@end
+*** header
+@class MyClass;
+@interface MyClass {
+   int myvar;
+}
+-(int)myInstanceMethod:(int)myArg;
++(int)myClassMethod:(int)myArg;
+@end
+*** source
+@implementation MyClass
+-(int)myInstanceMethod:(int)myArg { return myArg; }
++(int)myClassMethod:(int)myArg { return myArg; }
+@end
 
 
 * comments
