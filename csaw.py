@@ -2,7 +2,7 @@
 
 """
 
-CSAW by Robin Allen <r@foon.uk>
+csaw by Robin Allen <r@foon.uk>
 
 
 Licence
@@ -41,11 +41,15 @@ Preprocessor
    custom directive is supported, #pragma depends, which marks all items
    in a file as depending on a specific name.
 
+   We don't read function bodies, so preprocessor directives inside a
+   function will make it through csaw unchanged.
+
 Qt
 ==
 
     Pass -qt and Q_OBJECT will be recognized. This makes the emitted
     source file suitable for processing with moc.
+
 """
 
 from collections import defaultdict
