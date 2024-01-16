@@ -1231,6 +1231,7 @@ class Declaration(Node):
     @property
     def is_inline_or_template_function(self):
         return self.function_body and (
+            self.specifier.is_constexpr or
             self.specifier.is_inline or (
                 self.specifier.template_params and
                 not local.RecordScope
