@@ -1248,7 +1248,12 @@ class Declaration(Node):
         if self.is_inline_or_template_function:
             self.emit_function_definition(f)
             return
+
+        # If this is a template struct or class
+        if self.specifier.record_definition and self.specifier.template_params:
+            return
         
+        # If this is a struct or class
         record = self.specifier.record_definition
         if record:
             record.emit_inline_function_definitions(f)
